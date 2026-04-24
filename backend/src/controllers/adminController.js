@@ -769,6 +769,79 @@ async function syncCrew(req, res) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// getCrewLocations — GET /api/admin/crew-locations
+// Returns the last known location per driver per active job for this tenant.
+// "Active" means job status in (enroute, arrived, in_progress).
+// Locations are captured automatically on each status change in the PWA.
+// ---------------------------------------------------------------------------
+async function getCrewLocations(req, res) {
+  const locationId = req.user.locationId;
+
+  try {
+    // 1. Active jobs for this tenant
+    const { data: activeJobs, error: jobsErr } = await supabase
+      .from('mh_pwa_jobs')
+      .select('id, customer_name, status, pickup_address')
+      .eq('location_id', locationId)
+      .in('status', ['enroute', 'arrived', 'in_progress']);
+
+    if (jobsErr) throw jobsErr;
+    if (!activeJobs?.length) return res.json({ drivers: [] });
+
+    const jobIds  = activeJobs.map((j) => j.id);
+    const jobMap  = Object.fromEntries(activeJobs.map((j) => [j.id, j]));
+
+    // 2. All location pings for those jobs, latest first
+    const { data: locations, error: locErr } = await supabase
+      .from('mh_pwa_job_locations')
+      .select('job_id, crew_user_id, latitude, longitude, accuracy, trigger_event, timestamp')
+      .in('job_id', jobIds)
+      .order('timestamp', { ascending: false });
+
+    if (locErr) throw locErr;
+    if (!locations?.length) return res.json({ drivers: [] });
+
+    // 3. Crew names
+    const crewIds = [...new Set(locations.map((l) => l.crew_user_id))];
+    const { data: crew, error: crewErr } = await supabase
+      .from('mh_pwa_crew_users')
+      .select('id, full_name')
+      .in('id', crewIds);
+
+    if (crewErr) throw crewErr;
+    const crewMap = Object.fromEntries((crew ?? []).map((c) => [c.id, c.full_name]));
+
+    // 4. Keep only the latest ping per driver+job
+    const seen    = new Set();
+    const drivers = [];
+    for (const loc of locations) {
+      const key = `${loc.crew_user_id}_${loc.job_id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const job = jobMap[loc.job_id];
+      drivers.push({
+        crewId:        loc.crew_user_id,
+        crewName:      crewMap[loc.crew_user_id] ?? 'Unknown',
+        jobId:         loc.job_id,
+        customerName:  job?.customer_name  ?? '',
+        jobStatus:     job?.status         ?? '',
+        pickupAddress: job?.pickup_address ?? '',
+        lat:           loc.latitude,
+        lng:           loc.longitude,
+        accuracy:      loc.accuracy,
+        triggerEvent:  loc.trigger_event,
+        timestamp:     loc.timestamp,
+      });
+    }
+
+    return res.json({ drivers });
+  } catch (err) {
+    logger.error(`getCrewLocations error location=${locationId}: ${err.message}`);
+    return res.status(500).json({ error: 'Failed to fetch crew locations' });
+  }
+}
+
 module.exports = {
   requireAdmin,
   getPipelines,
@@ -788,4 +861,5 @@ module.exports = {
   updateInvoiceSettings,
   getNotificationSettings,
   updateNotificationSettings,
+  getCrewLocations,
 };

@@ -114,3 +114,9 @@ export async function updateNotificationSettings(settings) {
   const res = await api.patch('/admin/notification-settings', settings);
   return res.data;
 }
+
+/** GET /admin/crew-locations → { drivers } */
+export async function getCrewLocations() {
+  const res = await api.get('/admin/crew-locations');
+  return res.data;
+}

@@ -439,6 +439,31 @@ export default function JobDetailPage() {
           </div>
         )}
 
+        {/* ---- Action area — top of page so crew don't have to scroll ---- */}
+
+        {/* Terminal states */}
+        {job.status === 'completed' && (
+          <div style={styles.completedBadge}>Job completed</div>
+        )}
+
+        {job.status === 'cancelled' && (
+          <div style={styles.cancelledBadge}>This job has been cancelled</div>
+        )}
+
+        {/* Active states — forward action only at the top */}
+        {transition && (
+          <button
+            className="btn-primary"
+            onClick={() => setModal(job.status === 'in_progress' ? 'complete' : `confirm:${transition.next}`)}
+            disabled={updating}
+            style={{ width: '100%', fontSize: 'var(--font-size-md)' }}
+          >
+            {updating
+              ? <span className="spinner" style={{ width: 18, height: 18, borderWidth: 2 }} />
+              : <>{transition.icon} {transition.label}</>}
+          </button>
+        )}
+
         {/* Customer */}
         <Section title="Customer">
           <DetailRow icon={personIcon} value={customerName} large />
@@ -691,72 +716,18 @@ export default function JobDetailPage() {
           </div>
         )}
 
-        {/* ---- Action area ---- */}
-
-        {/* Terminal states — read-only */}
-        {job.status === 'completed' && (
-          <div style={styles.completedBadge}>Job completed</div>
+        {/* Cancel — at the bottom, away from the primary action to prevent fat-finger mistakes */}
+        {canCancel && (
+          <button
+            className="btn-danger"
+            style={{ width: '100%' }}
+            onClick={() => setModal('cancel')}
+            disabled={updating}
+          >
+            Cancel Job
+          </button>
         )}
 
-        {job.status === 'cancelled' && (
-          <div style={styles.cancelledBadge}>This job has been cancelled</div>
-        )}
-
-        {/* Active states — show action buttons */}
-        {!['completed', 'cancelled'].includes(job.status) && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
-
-            {/* Primary forward-transition button (not shown for in_progress — "Complete" is below) */}
-            {transition && job.status !== 'in_progress' && (
-              <button
-                className="btn-primary"
-                onClick={() => setModal(`confirm:${transition.next}`)}
-                disabled={updating}
-                style={{ width: '100%', fontSize: 'var(--font-size-md)' }}
-              >
-                {updating
-                  ? <span className="spinner" style={{ width: 18, height: 18, borderWidth: 2 }} />
-                  : <>{transition.icon} {transition.label}</>}
-              </button>
-            )}
-
-            {/* in_progress: Complete + Cancel side by side */}
-            {job.status === 'in_progress' && (
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button
-                  className="btn-primary"
-                  style={{ flex: 1, fontSize: 'var(--font-size-md)' }}
-                  onClick={() => setModal('complete')}
-                  disabled={updating}
-                >
-                  {updating
-                    ? <span className="spinner" style={{ width: 18, height: 18, borderWidth: 2 }} />
-                    : '✅ Complete Job'}
-                </button>
-                <button
-                  className="btn-danger"
-                  style={{ flex: 1 }}
-                  onClick={() => setModal('cancel')}
-                  disabled={updating}
-                >
-                  Cancel Job
-                </button>
-              </div>
-            )}
-
-            {/* Cancel button for non-in_progress active statuses */}
-            {canCancel && job.status !== 'in_progress' && (
-              <button
-                className="btn-danger"
-                style={{ width: '100%' }}
-                onClick={() => setModal('cancel')}
-                disabled={updating}
-              >
-                Cancel Job
-              </button>
-            )}
-          </div>
-        )}
       </main>
 
       <BottomNav />

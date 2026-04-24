@@ -24,6 +24,7 @@ const {
   updateInvoiceSettings,
   getNotificationSettings,
   updateNotificationSettings,
+  getCrewLocations,
 } = require('../controllers/adminController');
 
 const router = Router();
@@ -48,6 +49,7 @@ router.get('/invoice-settings',   requireAuth,              getInvoiceSettings);
 router.patch('/invoice-settings', requireAuth, requireAdmin, updateInvoiceSettings);
 router.get('/notification-settings',   requireAuth, requireAdmin, getNotificationSettings);
 router.patch('/notification-settings', requireAuth, requireAdmin, updateNotificationSettings);
+router.get('/crew-locations',          requireAuth, requireAdmin, getCrewLocations);
 
 // ---------------------------------------------------------------------------
 // POST /api/admin/refresh-fields/:locationId

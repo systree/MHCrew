@@ -1,120 +1,116 @@
 import { useState, useEffect } from 'react';
 
-// ---------------------------------------------------------------------------
-// Storage helpers — same snooze pattern as NotificationPromptCard
-// ---------------------------------------------------------------------------
-const STORAGE_KEY = 'mh_location_prompt';
-const SNOOZE_DAYS = 7;
-const SNOOZE_MS   = SNOOZE_DAYS * 24 * 60 * 60 * 1000;
+// Permanent grant record — only written on success so we never flash the card
+// when the user has already granted. Never written on dismiss.
+const GRANTED_KEY = 'mh_location_granted';
 
-function getStoredState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+function isGrantedPermanent() {
+  try { return localStorage.getItem(GRANTED_KEY) === '1'; } catch { return false; }
 }
-
-function isSuppressed() {
-  const stored = getStoredState();
-  if (!stored) return false;
-  if (stored.permanent) return true;
-  return Date.now() - stored.at < SNOOZE_MS;
-}
-
-function markPermanent() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ at: Date.now(), permanent: true })); } catch {}
-}
-
-function markSnoozed() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ at: Date.now(), permanent: false })); } catch {}
+function markGrantedPermanent() {
+  try { localStorage.setItem(GRANTED_KEY, '1'); } catch {}
 }
 
 // ---------------------------------------------------------------------------
 // LocationPromptCard
 //
-// Shown once (with snooze) on the Dashboard.
-// Handles three states:
-//   • not supported     — hide entirely
-//   • denied            — hide (nothing we can do)
-//   • prompt / granted  — show Enable / Not Now
+// Shows on every dashboard session until geolocation is granted.
+// "Later" hides for the current tab session only (sessionStorage).
+// There is no permanent dismiss — the card re-appears on every app open
+// until the driver grants the permission.
+//
+// States:
+//   granted   → mark permanent, never show again
+//   denied    → show a "blocked" info banner (can't request again)
+//   prompt    → show Enable / Later
 // ---------------------------------------------------------------------------
 export default function LocationPromptCard() {
-  const [show, setShow]     = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError]   = useState(null);
+  const [state, setState] = useState('loading'); // 'loading'|'granted'|'denied'|'prompt'|'snoozed'
+  const [reqError, setReqError] = useState(null);
+  const [loading, setLoading]   = useState(false);
 
   const supported = Boolean(navigator.geolocation);
 
   useEffect(() => {
-    if (!supported || isSuppressed()) return;
+    if (!supported) { setState('unavailable'); return; }
+    if (isGrantedPermanent()) { setState('granted'); return; }
+    if (sessionStorage.getItem('mh_loc_snoozed') === '1') { setState('snoozed'); return; }
 
     if (!navigator.permissions) {
-      // Permissions API not available — show the prompt and let the browser decide
-      setShow(true);
+      setState('prompt');
       return;
     }
 
     navigator.permissions.query({ name: 'geolocation' }).then((result) => {
       if (result.state === 'granted') {
-        // Already granted — mark permanent so we never bother the user again
-        markPermanent();
+        markGrantedPermanent();
+        setState('granted');
         return;
       }
-      if (result.state === 'denied') return; // blocked at OS level — nothing to do
+      if (result.state === 'denied') {
+        setState('denied');
+        return;
+      }
+      setState('prompt');
 
-      // 'prompt' state — show the card
-      setShow(true);
-
-      // React if the user changes permission in browser settings while the page is open
       result.onchange = () => {
         if (result.state === 'granted') {
-          markPermanent();
-          setShow(false);
+          markGrantedPermanent();
+          setState('granted');
         } else if (result.state === 'denied') {
-          setShow(false);
+          setState('denied');
         }
       };
-    }).catch(() => {
-      // Fallback: Permissions API threw — show the prompt anyway
-      setShow(true);
-    });
+    }).catch(() => setState('prompt'));
   }, [supported]);
 
-  if (!show) return null;
+  // Nothing to show in these states
+  if (state === 'loading' || state === 'granted' || state === 'unavailable' || state === 'snoozed') return null;
 
+  // OS-level blocked — we can't request again, inform the driver
+  if (state === 'denied') {
+    return (
+      <div style={{ ...cardStyle, borderColor: 'rgba(234,179,8,0.3)' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <div style={{ ...iconWrapStyle, background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.2)', color: '#facc15' }}>
+            {warnIcon}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={titleStyle}>Location Access Blocked</p>
+            <p style={bodyStyle}>
+              Location is blocked in your browser settings. Tap the lock icon in your address bar and allow Location to enable job tracking.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Prompt state — ask for permission
   const handleEnable = () => {
     setLoading(true);
-    setError(null);
+    setReqError(null);
     navigator.geolocation.getCurrentPosition(
       () => {
-        markPermanent();
+        markGrantedPermanent();
         setLoading(false);
-        setShow(false);
+        setState('granted');
       },
       (err) => {
         setLoading(false);
         if (err.code === err.PERMISSION_DENIED) {
-          // User denied — stop asking
-          markPermanent();
-          setShow(false);
+          setState('denied');
         } else {
-          setError('Could not get location. Please try again.');
+          setReqError('Could not get location. Please try again.');
         }
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
   };
 
-  const handleDismiss = () => {
-    markSnoozed();
-    setShow(false);
-  };
-
-  const handleNeverAsk = () => {
-    markPermanent();
-    setShow(false);
+  const handleLater = () => {
+    try { sessionStorage.setItem('mh_loc_snoozed', '1'); } catch {}
+    setState('snoozed');
   };
 
   return (
@@ -126,20 +122,12 @@ export default function LocationPromptCard() {
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={titleStyle}>Enable Location Access</p>
           <p style={bodyStyle}>
-            Allows the app to show job sites on a map and auto-fill your location when clocking in.
+            Required so the app can record your position when you update a job status — lets the admin see where you are on a map.
           </p>
-          {error && (
-            <p style={{ fontSize: 'var(--font-size-xs)', color: '#f87171', marginTop: 6 }}>{error}</p>
+          {reqError && (
+            <p style={{ fontSize: 'var(--font-size-xs)', color: '#f87171', marginTop: 6 }}>{reqError}</p>
           )}
         </div>
-        <button
-          type="button"
-          onClick={handleDismiss}
-          style={closeStyle}
-          aria-label="Dismiss"
-        >
-          {closeIcon}
-        </button>
       </div>
 
       <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
@@ -161,9 +149,9 @@ export default function LocationPromptCard() {
           type="button"
           className="btn-secondary"
           style={{ flex: 1, padding: '10px 0' }}
-          onClick={handleNeverAsk}
+          onClick={handleLater}
         >
-          Not Now
+          Later
         </button>
       </div>
     </div>
@@ -206,21 +194,6 @@ const bodyStyle = {
   lineHeight: 1.5,
 };
 
-const closeStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  width: 28,
-  height: 28,
-  borderRadius: 'var(--radius-sm)',
-  border: 'none',
-  background: 'transparent',
-  color: 'var(--color-text-muted)',
-  cursor: 'pointer',
-  flexShrink: 0,
-  padding: 0,
-};
-
 const locationIcon = (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
@@ -228,9 +201,10 @@ const locationIcon = (
   </svg>
 );
 
-const closeIcon = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <line x1="18" y1="6" x2="6" y2="18" />
-    <line x1="6" y1="6" x2="18" y2="18" />
+const warnIcon = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+    <line x1="12" y1="9" x2="12" y2="13" />
+    <line x1="12" y1="17" x2="12.01" y2="17" />
   </svg>
 );

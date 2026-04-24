@@ -15,6 +15,7 @@ import CrewManagementPage from './pages/admin/CrewManagementPage.jsx';
 import AdminJobsPage from './pages/admin/AdminJobsPage.jsx';
 import AdminInvoiceSettingsPage from './pages/admin/AdminInvoiceSettingsPage.jsx';
 import AdminNotificationSettingsPage from './pages/admin/AdminNotificationSettingsPage.jsx';
+import CrewMapPage from './pages/admin/CrewMapPage.jsx';
 import CreateInvoicePage from './pages/CreateInvoicePage.jsx';
 
 /**
@@ -131,6 +132,14 @@ export default function App() {
           element={
             <AdminRoute>
               <AdminNotificationSettingsPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/crew-map"
+          element={
+            <AdminRoute>
+              <CrewMapPage />
             </AdminRoute>
           }
         />
