@@ -1,0 +1,542 @@
+/* ============================================================
+   CSS Reset + Mobile-First Base Styles
+   Dark theme for field crew use
+   ============================================================ */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  /* Color palette */
+  --color-bg:           #0f0f1a;
+  --color-surface:      #1a1a2e;
+  --color-surface-2:    #16213e;
+  --color-surface-3:    #0f3460;
+  --color-border:       #2a2a45;
+  --color-primary:      #e94560;
+  --color-primary-dark: #c73652;
+  --color-text:         #f0f0f5;
+  --color-text-muted:   #8888aa;
+  --color-text-dim:     #55556a;
+
+  /* Status colors */
+  --status-assigned:    #6b7280;
+  --status-enroute:     #3b82f6;
+  --status-arrived:     #f97316;
+  --status-in-progress: #eab308;
+  --status-completed:   #22c55e;
+  --status-cancelled:   #ef4444;
+
+  /* Spacing */
+  --spacing-xs:  4px;
+  --spacing-sm:  8px;
+  --spacing-md:  16px;
+  --spacing-lg:  24px;
+  --spacing-xl:  32px;
+  --spacing-2xl: 48px;
+
+  /* Typography */
+  --font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-size-xs:   11px;
+  --font-size-sm:   13px;
+  --font-size-base: 15px;
+  --font-size-md:   17px;
+  --font-size-lg:   20px;
+  --font-size-xl:   24px;
+  --font-size-2xl:  30px;
+
+  /* Border radius */
+  --radius-sm:   6px;
+  --radius-md:   10px;
+  --radius-lg:   16px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
+
+  /* Bottom nav height (accounts for safe area) */
+  --bottom-nav-height: 64px;
+
+  /* Transition */
+  --transition-fast: 150ms ease;
+  --transition-base: 250ms ease;
+}
+
+html {
+  font-size: var(--font-size-base);
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.5;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  /* Support iOS safe areas */
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+#root {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- Typography ---- */
+
+h1, h2, h3, h4, h5, h6 {
+  line-height: 1.2;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+p {
+  color: var(--color-text);
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* ---- Form elements ---- */
+
+input, button, textarea, select {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+input[type="text"],
+input[type="tel"],
+input[type="number"],
+input[type="password"] {
+  background-color: var(--color-surface);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  padding: 14px var(--spacing-md);
+  width: 100%;
+  transition: border-color var(--transition-fast);
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+input[type="text"]:focus,
+input[type="tel"]:focus,
+input[type="number"]:focus,
+input[type="password"]:focus {
+  border-color: var(--color-primary);
+}
+
+input[type="text"]::placeholder,
+input[type="tel"]::placeholder,
+input[type="number"]::placeholder,
+input[type="password"]::placeholder {
+  color: var(--color-text-dim);
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+button:active {
+  transform: scale(0.97);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ---- Primary button ---- */
+
+.btn-primary {
+  background-color: var(--color-primary);
+  color: #fff;
+  padding: 15px var(--spacing-lg);
+  width: 100%;
+  font-size: var(--font-size-md);
+  border-radius: var(--radius-md);
+}
+
+.btn-primary:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+/* ---- Secondary button ---- */
+
+.btn-secondary {
+  background-color: var(--color-surface-2);
+  color: var(--color-text);
+  border: 1.5px solid var(--color-border);
+  padding: 13px var(--spacing-lg);
+  width: 100%;
+  font-size: var(--font-size-md);
+  border-radius: var(--radius-md);
+}
+
+/* ---- Danger button ---- */
+
+.btn-danger {
+  background-color: var(--status-cancelled);
+  color: #fff;
+  padding: 15px var(--spacing-lg);
+  width: 100%;
+  font-size: var(--font-size-md);
+  border-radius: var(--radius-md);
+}
+
+.btn-danger:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+/* ---- Ghost button ---- */
+
+.btn-ghost {
+  background: transparent;
+  color: var(--color-text-muted);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--font-size-sm);
+}
+
+.btn-ghost:hover {
+  color: var(--color-text);
+}
+
+/* ---- Page layout ---- */
+
+.page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom));
+}
+
+.page-header {
+  padding: var(--spacing-md) var(--spacing-md) var(--spacing-sm);
+  padding-top: calc(var(--spacing-md) + env(safe-area-inset-top));
+  background-color: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.page-content {
+  flex: 1;
+  padding: var(--spacing-md);
+  overflow-y: auto;
+}
+
+/* ---- Card ---- */
+
+.card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+}
+
+/* ---- Divider ---- */
+
+.divider {
+  height: 1px;
+  background-color: var(--color-border);
+  margin: var(--spacing-md) 0;
+}
+
+/* ---- Loading spinner ---- */
+
+.spinner {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(5px); }
+}
+
+/* ---- Utility classes ---- */
+
+.text-muted   { color: var(--color-text-muted); }
+.text-sm      { font-size: var(--font-size-sm); }
+.text-xs      { font-size: var(--font-size-xs); }
+.text-center  { text-align: center; }
+.font-bold    { font-weight: 700; }
+.font-medium  { font-weight: 500; }
+.flex         { display: flex; }
+.flex-col     { flex-direction: column; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.gap-sm       { gap: var(--spacing-sm); }
+.gap-md       { gap: var(--spacing-md); }
+.w-full       { width: 100%; }
+.mt-sm        { margin-top: var(--spacing-sm); }
+.mt-md        { margin-top: var(--spacing-md); }
+.mt-lg        { margin-top: var(--spacing-lg); }
+
+/* ---- Scrollbar (desktop preview) ---- */
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: var(--radius-full);
+}
+
+/* ============================================================
+   Offline / Sync Banners
+   ============================================================ */
+
+/* Slide-down entrance for both offline and sync banners */
+@keyframes bannerSlideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/**
+ * .offline-banner
+ * Base class for the fixed top banner.  Background colour is set inline
+ * by the component so it can swap between amber (offline) and teal/green
+ * (syncing / caught up) without extra specificity battles.
+ */
+.offline-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  padding-top: calc(10px + env(safe-area-inset-top));
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  animation: bannerSlideDown 0.25s ease forwards;
+}
+
+/**
+ * .sync-banner
+ * Applied in addition to .offline-banner when the device is back online
+ * and either syncing or showing the "All caught up" confirmation.
+ * Background is set inline; this class exists for selector specificity
+ * and any future visual overrides.
+ */
+.sync-banner {
+  /* teal / green tones — background set inline by the component */
+}
+
+/**
+ * .queue-count
+ * Pill badge showing the number of pending queued actions.
+ * Rendered inline within the banner text.
+ */
+.queue-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  margin: 0 3px;
+  border-radius: var(--radius-full);
+  background-color: rgba(255, 255, 255, 0.25);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: middle;
+  /* Subtle pop-in when the count changes */
+  animation: queueCountPop 0.15s ease;
+}
+
+@keyframes queueCountPop {
+  0%   { transform: scale(0.7); opacity: 0.5; }
+  60%  { transform: scale(1.15); }
+  100% { transform: scale(1);   opacity: 1; }
+}
+
+/* ============================================================
+   Photo Capture / Gallery
+   ============================================================ */
+
+/* 2-column photo grid */
+.photo-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* Each thumbnail cell */
+.photo-thumb {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background-color: var(--color-surface-2);
+  cursor: pointer;
+}
+
+.photo-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform var(--transition-base);
+}
+
+.photo-thumb:active img {
+  transform: scale(0.97);
+}
+
+/* Type label pill overlaid at the bottom of each thumbnail */
+.photo-type-label {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: var(--radius-full);
+  pointer-events: none;
+  line-height: 1.4;
+}
+
+/* Delete button overlay — top-right corner of each thumb */
+.photo-delete-btn {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 26px;
+  height: 26px;
+  background: rgba(239, 68, 68, 0.85);
+  border: none;
+  border-radius: var(--radius-full);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.photo-thumb:hover .photo-delete-btn,
+.photo-thumb:focus-within .photo-delete-btn {
+  opacity: 1;
+}
+
+/* Always visible on touch devices (no hover) */
+@media (hover: none) {
+  .photo-delete-btn {
+    opacity: 1;
+  }
+}
+
+/* Full-screen lightbox overlay */
+.photo-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+/* Upload progress bar */
+.upload-progress {
+  position: relative;
+  width: 100%;
+  height: 24px;
+  background-color: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.upload-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-primary-dark), var(--color-primary));
+  border-radius: var(--radius-full);
+  transition: width 150ms ease;
+}
+
+.upload-progress-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: #fff;
+  pointer-events: none;
+}
+
+/* Horizontal scrolling row of photo type pill selectors */
+.photo-type-pills {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  /* Hide scrollbar but keep scrollability */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.photo-type-pills::-webkit-scrollbar {
+  display: none;
+}

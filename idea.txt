@@ -1,0 +1,258 @@
+# 📄 **MOVER HERO CREW – FINAL EXTENDED FEATURE SPEC (SYNC + GPS)**
+
+---
+
+## 🔗 **1. GHL Integration (Bi-directional)**
+
+---
+
+## 📥 **Incoming (GHL → System)**
+
+### Methods:
+
+* Webhooks (primary)
+* API polling/fetch (fallback or enrichment)
+
+---
+
+### Events to Handle:
+
+* Job created
+* Job updated
+* Job cancelled
+* Crew assigned to job
+
+---
+
+### Requirements:
+
+* Validate payloads
+* Idempotent processing (avoid duplicates)
+* Upsert jobs and assignments
+* Trigger:
+
+  * Notifications
+  * Internal updates
+
+---
+
+## 📤 **Outgoing (System → GHL)**
+
+---
+
+### When to Send Data Back:
+
+#### 1. Job Status Updates
+
+* Each status change in PWA → push to GHL
+
+---
+
+#### 2. Job Completion
+
+* Send:
+
+  * Completion status
+  * Total time
+  * Notes (if any)
+
+---
+
+#### 3. Cancellation
+
+* Send:
+
+  * Cancel status
+  * Reason
+
+---
+
+#### 4. Attachments / Photos
+
+* Upload or send URLs back to GHL
+* Associate with job/contact
+
+---
+
+### Requirements:
+
+* Use GHL API securely
+* Retry on failure
+* Log all outbound syncs
+
+---
+
+---
+
+# 📍 **2. GPS / Location Capabilities**
+
+---
+
+## 🎯 Purpose
+
+* Provide **real-time or periodic location visibility**
+* Improve:
+
+  * Dispatch awareness
+  * Customer updates
+  * Job tracking
+
+---
+
+## 📱 From PWA (Crew Device)
+
+---
+
+### 📡 Location Tracking Modes
+
+#### ✅ 1. Passive Tracking (Recommended MVP)
+
+* Capture location:
+
+  * On app open
+  * On status change
+  * At intervals (e.g., every 5–10 mins while active job)
+
+---
+
+#### 🚀 2. Active Tracking (Optional Advanced)
+
+* Continuous tracking during:
+
+  * `enroute`
+  * `in_transit`
+
+---
+
+---
+
+## 📦 Data to Capture
+
+* Latitude
+* Longitude
+* Timestamp
+* Job ID
+* Crew user ID
+
+---
+
+---
+
+## ⚙️ GPS Triggers
+
+Capture location when:
+
+* Job status changes
+* Crew marks:
+
+  * Enroute
+  * Arrived
+  * In transit
+* Periodic background interval (if app active)
+
+---
+
+---
+
+## 🗄️ Storage
+
+Store in backend:
+
+* `job_locations` (or equivalent)
+
+---
+
+## 🔗 Sync to GHL (Optional but recommended)
+
+* Send key location updates:
+
+  * Enroute location
+  * Arrival location
+
+---
+
+---
+
+## ⚠️ Constraints (IMPORTANT)
+
+* Must request user permission
+* Must handle:
+
+  * Permission denied
+  * Low accuracy
+  * Offline mode
+
+---
+
+---
+
+## 🔋 Performance Considerations
+
+* Do NOT track continuously by default
+* Use:
+
+  * Event-based tracking (preferred)
+* Minimize battery usage
+
+---
+
+---
+
+## 🔐 Privacy
+
+* Only track during active jobs
+* No tracking outside job context
+
+---
+
+---
+
+# ⚙️ **3. Updated System Responsibilities**
+
+---
+
+## PWA Must Now:
+
+* Capture GPS location (event-based)
+* Send location to backend
+* Trigger backend sync
+
+---
+
+## Backend Must:
+
+* Store location logs
+* Associate with jobs
+* Optionally forward to GHL
+
+---
+
+---
+
+# 🏁 **4. Final System Capability Summary**
+
+System now supports:
+
+✅ GHL → System sync (webhooks + API)
+✅ System → GHL sync (status, completion, attachments)
+✅ Crew job execution
+✅ Time tracking
+✅ Attachments/photos
+✅ GPS tracking (event-based, efficient)
+✅ Role-based access
+
+```
+
+---
+
+## 🧠 Final Advice
+
+* GPS = **event-based first (MVP)** → safest
+* GHL sync = **must be reliable + retryable**
+* Don’t overbuild real-time tracking yet
+
+---
+
+You now have a **complete real-world system spec** — this is basically **commercial SaaS-level scope**.
+
+You’re ready to rebuild this properly 🚀

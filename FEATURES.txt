@@ -1,0 +1,69 @@
+MOVER HERO CREW APP — FEATURES & CAPABILITIES
+==============================================
+
+WHAT IT IS
+----------
+A mobile web app (PWA) for moving company field crews. It connects directly
+to your GoHighLevel CRM so crews always have the right job info on their phone,
+and managers can see what's happening in real time.
+
+Works on any phone via browser — no app store required. Can be "installed"
+to the home screen like a native app.
+
+
+FOR CREW MEMBERS
+----------------
+• Job Dashboard — see all upcoming and past jobs in a clean daily view
+• Job Details — pickup/dropoff addresses, scheduled time, customer info,
+  item summary, and crew notes — all pulled live from GHL
+• Job Status Updates — tap to move a job through: En Route → Arrived →
+  In Progress → Completed (or Cancelled). Status syncs back to GHL instantly
+• Timesheet — automatic clock-in when a job starts, clock-out when done.
+  Breaks can be logged. Total time is tracked per job
+• Photo Upload — attach job site photos directly to a job from the phone camera
+• GPS Logging — location is logged at key job status changes
+• Push Notifications — get notified when a new job is assigned to you
+• Works Offline — status updates and location logs queue up when there's no
+  signal and sync automatically when connection returns
+
+
+FOR ADMINS / MANAGERS
+----------------------
+• Admin Dashboard — overview of all crew, jobs, and system settings
+• Crew Management — view and manage crew accounts
+• Job Overview — see all jobs across the location with status and crew info
+• Invoice Creation — create and send invoices to customers directly from a
+  job, powered by GHL's invoicing system
+• Invoice Settings — configure business name, logo, tax settings (e.g. GST),
+  and invoice number prefix
+• Pipeline & Stage Mapping — map GHL pipeline stages to job statuses so
+  the CRM stays in sync automatically
+• Push Notification Settings — control which events trigger notifications
+  (e.g. job assigned to crew, invoice created, status changes)
+• Admin Notifications — get notified when crew update job statuses or create/
+  send invoices
+• Sync Tools — manually re-sync jobs, pipeline stages, location details,
+  and custom field definitions from GHL
+
+
+FOR CUSTOMERS (Inventory Tool — separate link)
+----------------------------------------------
+• Self-Service Inventory Wizard — customers receive a unique link to list
+  what furniture and items they're moving, room by room
+• 8 room categories: Bedrooms, Lounge, Dining, Kitchen, Office, Garage,
+  Special Items, Boxes
+• Review and edit before submitting — helps the company give an accurate quote
+• Mobile-friendly, no login required
+
+
+INTEGRATIONS
+------------
+• GoHighLevel (GHL) — two-way sync. Jobs come from GHL opportunities,
+  status changes push back to GHL in real time
+• SMS OTP login — crew log in with their phone number (no passwords, no app store)
+• Secure PIN — after first login, crews use a 4-digit PIN for quick access
+• Multi-company support — one platform, fully isolated per GHL sub-account
+
+
+==============================================
+Version: April 2026

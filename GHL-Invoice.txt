@@ -1,0 +1,253 @@
+# GoHighLevel API – Create Invoice (Claude Reference)
+
+## Overview
+
+This endpoint allows you to create an invoice in GoHighLevel.
+
+* Method: `POST`
+* Endpoint: `/invoices/`
+* Purpose: Create a new invoice for a contact/customer
+
+---
+
+## Authentication
+
+* Type: Bearer Token (JWT)
+* Use either:
+
+  * Sub-account access token, OR
+  * Private integration token
+
+Header:
+
+```
+Authorization: Bearer <ACCESS_TOKEN>
+Content-Type: application/json
+```
+
+---
+
+## Request Structure
+
+### Base Payload (Typical Fields)
+
+```json
+{
+  "locationId": "string",
+  "contactId": "string",
+  "title": "INVOICE",
+  "issueDate": "YYYY-MM-DD",
+  "dueDate": "YYYY-MM-DD",
+  "currency": "USD",
+  "invoiceNumber": "string",
+  "discount": {
+    "type": "percentage | fixed",
+    "value": 10
+  },
+  "invoiceItems": [
+    {
+      "productId": "string",
+      "priceId": "string",
+      "name": "Product Name",
+      "qty": 1,
+      "amount": 100,
+      "currency": "USD",
+      "taxes": []
+    }
+  ]
+}
+```
+
+---
+
+## Key Fields Explained
+
+### Core Fields
+
+* `locationId` → Sub-account (required context)
+* `contactId` → Customer receiving invoice
+* `title` → Invoice title (e.g. "INVOICE")
+* `issueDate` → Invoice creation date
+* `dueDate` → Payment due date
+* `currency` → Currency code (e.g. USD)
+
+### Invoice Items
+
+Each item includes:
+
+* `productId` → Product reference
+* `priceId` → Pricing reference
+* `name` → Item name
+* `qty` → Quantity
+* `amount` → Total amount for item
+* `taxes` → Array of tax objects (optional)
+
+### Discount
+
+* `type`: `"percentage"` or `"fixed"`
+* `value`: numeric discount value
+
+---
+
+## Response Codes
+
+* `200` → Success
+* `400` → Bad request (invalid payload)
+* `401` → Unauthorized (invalid token)
+* `422` → Validation error
+
+---
+
+## Example Response (Simplified)
+
+```json
+{
+  "_id": "invoice_id",
+  "status": "draft",
+  "invoiceNumber": "19",
+  "currency": "USD",
+  "total": 999,
+  "amountDue": 999,
+  "issueDate": "2023-01-01",
+  "dueDate": "2023-01-01",
+  "contactDetails": {
+    "id": "contact_id",
+    "name": "John Doe",
+    "email": "[email protected]"
+  },
+  "invoiceItems": [
+    {
+      "name": "Product Name",
+      "qty": 1,
+      "amount": 999
+    }
+  ]
+}
+```
+
+---
+
+## Notes / Implementation Tips
+
+* Invoice is typically created in `draft` status initially.
+* You must separately call **Send Invoice API** to deliver it.
+* Products and pricing should already exist in GHL.
+* Taxes and discounts are optional but supported.
+* Currency must match your account/payment setup.
+
+---
+
+## Related APIs
+
+* Send Invoice
+* Update Invoice
+* Delete Invoice
+* List Invoices
+* Record Payment
+
+---
+
+## Workflow Summary
+
+1. Create invoice via POST `/invoices/`
+2. (Optional) Update invoice
+3. Send invoice to customer
+4. Track payment / status
+
+---
+
+## Common Pitfalls
+
+* Missing `locationId` or `contactId`
+* Invalid Bearer token
+* Using product/price IDs that don’t exist
+* Currency mismatch
+* Not sending invoice after creation
+
+---
+
+## Source
+
+Official GoHighLevel API Docs – Create Invoice Endpoint ([App Marketplace][1])
+
+[1]: https://marketplace.gohighlevel.com/docs/ghl/invoices/create-invoice?utm_source=chatgpt.com "Create Invoice | HighLevel API"
+
+##########################################################################################################################
+
+# GoHighLevel API – Send Invoice (Claude Reference)
+
+## Overview
+
+Send an existing invoice to a customer.
+
+* Method: POST
+* Endpoint: /invoices/{invoiceId}/send
+* Purpose: Trigger delivery of an invoice
+
+---
+
+## Authentication
+
+Header:
+Authorization: Bearer <ACCESS_TOKEN>
+Content-Type: application/json
+
+---
+
+## Path Parameters
+
+* invoiceId (string, required)
+  The ID of the invoice to send
+
+---
+
+## Request Body
+
+* No required body
+* Typically empty
+
+---
+
+## Behavior
+
+* Changes invoice status:
+
+  * draft → sent
+* Sends invoice via:
+
+  * Email and/or SMS (based on account settings)
+* Uses:
+
+  * Default invoice template
+  * Configured sender settings
+
+---
+
+## Response Codes
+
+* 200 → Success
+* 400 → Bad request
+* 401 → Unauthorized
+* 422 → Validation error
+
+---
+
+## Workflow Usage
+
+1. Create invoice (POST /invoices/)
+2. Send invoice (POST /invoices/{invoiceId}/send)
+
+---
+
+## Notes
+
+* Invoice must exist before sending
+* Invoice must not already be sent/void
+* Delivery method is not controlled via API (uses system config)
+* No payload customization available in this endpoint
+
+---
+
+## Source
+
+Official GoHighLevel Docs (Send Invoice Endpoint)

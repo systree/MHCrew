@@ -1,0 +1,166 @@
+================================================================
+MOVER HERO — WEBHOOK TEST PAYLOADS
+================================================================
+Endpoint (POST all to this URL):
+  http://localhost:3001/api/webhooks/ghl
+
+Headers (all requests):
+  Content-Type: application/json
+
+Fire in this exact order:
+  1. INSTALL
+  2. UserCreate
+  3. OpportunityCreate   ← needs a real GHL opportunity ID (see note)
+  4. OpportunityAssignedToUpdate
+
+================================================================
+IMPORTANT NOTES
+================================================================
+- Keep locationId IDENTICAL across all 4 payloads.
+- The "id" in UserCreate must match "assignedTo" in
+  OpportunityAssignedToUpdate.
+- The "id" in OpportunityCreate must match "id" in
+  OpportunityAssignedToUpdate.
+- OpportunityCreate triggers a live GHL API call using your
+  n8n token. Use a REAL opportunity ID from your GHL account.
+  If the ID is fake the job upsert will fail (fetchFullOpportunity
+  returns null) — all other events are safe to test with dummy IDs.
+- Use a phone number in UserCreate that is in OTP_BYPASS_PHONES
+  so you can log in to the app afterwards to see the job.
+
+================================================================
+1. INSTALL
+================================================================
+POST http://localhost:3001/api/webhooks/ghl
+
+{
+  "type": "INSTALL",
+  "appId": "69b74480d898d3b19b3aa6b5",
+  "locationId": "9hPV1rLOiOkrT5nIo81S",
+  "companyId": "otg8dTQqGLh3Q6iQI55w",
+  "userId": "n8Qz5uJ4VCsrV1ocHoVh",
+  "planId": "66a0419a0dffa47fb5f8b22f",
+  "trial": {
+    "onTrial": true,
+    "trialDuration": 10,
+    "trialStartDate": "2026-04-08T00:00:00.000Z"
+  },
+  "isWhitelabelCompany": false,
+  "companyName": "Test Moving Co"
+}
+
+Expected: 200 { "received": true }
+Check:    mh_pwa_tenants row created for locationId
+
+================================================================
+2. UserCreate
+================================================================
+POST http://localhost:3001/api/webhooks/ghl
+
+{
+  "type": "UserCreate",
+  "locationId": "9hPV1rLOiOkrT5nIo81S",
+  "id": "n8Qz5uJ4VCsrV1ocHoVh",
+  "firstName": "Sheikh",
+  "lastName": "Mishu",
+  "phone": "+61413157239",
+  "email": "sheikh.mishu.au@gmail.com",
+  "role": "user"
+}
+
+Expected: 200 { "received": true }
+Check:    mh_pwa_crew_users row created with:
+            ghl_user_id = n8Qz5uJ4VCsrV1ocHoVh
+            location_id = 9hPV1rLOiOkrT5nIo81S
+            phone       = +61413157239
+
+================================================================
+3. OpportunityCreate
+================================================================
+POST http://localhost:3001/api/webhooks/ghl
+
+*** REPLACE "OTsECmcfm3tbhll6voxa" with a real GHL opportunity
+    ID from your account. The handler will call your GHL API to
+    fetch the full record (customer name, addresses, date etc). ***
+
+{
+  "type": "OpportunityCreate",
+  "locationId": "9hPV1rLOiOkrT5nIo81S",
+  "id": "OTsECmcfm3tbhll6voxa",
+  "name": "Test Move Job",
+  "pipelineId": "3ofwkPItMQsK9YfGngg6",
+  "pipelineStageId": "eb2f79fd-3598-46f3-babb-5268479fdf13",
+  "status": "open",
+  "monetaryValue": 450,
+  "contactId": "EcGCCcg8fZ9OflSZNKiD",
+  "assignedTo": "n8Qz5uJ4VCsrV1ocHoVh"
+}
+
+Expected: 200 { "received": true }
+Check:    mh_pwa_jobs row upserted with:
+            ghl_job_id  = OTsECmcfm3tbhll6voxa
+            location_id = 9hPV1rLOiOkrT5nIo81S
+            customer_name, pickup_address, dropoff_address populated
+            from GHL API response
+
+================================================================
+4. OpportunityAssignedToUpdate
+================================================================
+POST http://localhost:3001/api/webhooks/ghl
+
+{
+  "type": "OpportunityAssignedToUpdate",
+  "locationId": "9hPV1rLOiOkrT5nIo81S",
+  "id": "OTsECmcfm3tbhll6voxa",
+  "name": "Test Move Job",
+  "assignedTo": "n8Qz5uJ4VCsrV1ocHoVh",
+  "contactId": "EcGCCcg8fZ9OflSZNKiD",
+  "pipelineId": "3ofwkPItMQsK9YfGngg6",
+  "pipelineStageId": "eb2f79fd-3598-46f3-babb-5268479fdf13",
+  "status": "open",
+  "monetaryValue": 450
+}
+
+Expected: 200 { "received": true }
+Check:    mh_pwa_job_crew_assignments row created with:
+            job_id      = (uuid of the job created in step 3)
+            crew_user_id = (uuid of the crew user created in step 2)
+            assigned_by = "ghl"
+
+================================================================
+5. LOGIN TEST (after webhooks succeed)
+================================================================
+POST http://localhost:3001/api/auth/send-otp
+{ "phone": "+61413157239" }
+
+  → Check backend console for OTP (bypass active)
+
+POST http://localhost:3001/api/auth/verify-otp
+{ "phone": "+61413157239", "token": "123456" }
+
+  → Returns sessionToken + user
+  → Open frontend — job should appear on dashboard
+
+================================================================
+CHECKING RESULTS IN SUPABASE
+================================================================
+Run these in Supabase SQL editor to verify each step:
+
+-- 1. Tenant registered?
+SELECT * FROM mh_pwa_tenants;
+
+-- 2. Crew user created?
+SELECT id, full_name, phone, ghl_user_id, location_id, is_active
+FROM mh_pwa_crew_users;
+
+-- 3. Job created?
+SELECT id, ghl_job_id, customer_name, status, location_id
+FROM mh_pwa_jobs;
+
+-- 4. Assignment created?
+SELECT * FROM mh_pwa_job_crew_assignments;
+
+-- 5. Sync log (check for any failures)?
+SELECT event_type, status, error_message, created_at
+FROM mh_pwa_ghl_sync_log
+ORDER BY created_at DESC;

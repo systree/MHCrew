@@ -1,0 +1,52 @@
+AppInstall
+
+{
+  "type": "INSTALL",
+  "appId": "ve9EPM428h8vShlRW1KT",
+  "locationId": "otg8dTQqGLh3Q6iQI55w",
+  "companyId": "otg8dTQqGLh3Q6iQI55w",
+  "userId": "otg8dTQqGLh3Q6iQI55w",
+  "planId": "66a0419a0dffa47fb5f8b22f",
+  "trial": {
+    "onTrial": true,
+    "trialDuration": 10,
+    "trialStartDate": "2024-07-23T23:54:51.264Z"
+  },
+  "isWhitelabelCompany": true,
+  "whitelabelDetails": {
+    "domain": "example.com",
+    "logoUrl": "https://example.com/logo.png"
+  },
+  "companyName": "Example Company"
+}
+
+AppUninstall
+
+{
+  "type": "UNINSTALL",
+  "appId": "ve9EPM428h8vShlRW1KT",
+  "locationId": "otg8dTQqGLh3Q6iQI55w"
+}
+
+PlanChange
+
+{
+  "type": "PLAN_CHANGE",
+  "appId": "ve9EPM428h8vShlRW1KT",
+  "locationId": "otg8dTQqGLh3Q6iQI55w",
+  "companyId": "otg8dTQqGLh3Q6iQI55w",
+  "userId": "otg8dTQqGLh3Q6iQI55w",
+  "currentPlanId": "66a0419a0dffa47fb5f8b22f",
+  "newPlanId": "66a0419a0dffa47fb5f8b22f"
+}
+
+LocationUpdate
+
+{
+  "type": "LocationUpdate",
+  "id": "ve9EPM428h8vShlRW1KT",
+  "companyId": "otg8dTQqGLh3Q6iQI55w",
+  "name": "Loram ipsum",
+  "email": "mailer@example.com",
+  "stripeProductId": "prod_xyz123abc"
+}

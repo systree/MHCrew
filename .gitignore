@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Environment variables — never commit these
+.env
+**/.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+**/.env.production
+**/.env.development
+"backend/.env prod"
+backend/.env*
+
+# Build output
+dist/
+build/
+**/dist/
+frontend/dev-dist/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Vite
+frontend/.vite/
+
+# Misc — local scratch files
+*.psd
+*.zip
+backend/src.zip
+.claude/settings.local.json
