@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 3001;
 
 const allowedOrigins =
   process.env.NODE_ENV === "production"
-    ? ["https://mhcrew.413157239.xyz"]
+    ? (process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : [])
     : ["http://localhost:5173", "http://localhost:3000"];
 
 app.use(
