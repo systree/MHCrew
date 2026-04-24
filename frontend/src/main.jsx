@@ -30,6 +30,14 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') checkForUpdate();
   });
+
+  // When a new SW takes control, notify the UI so it can prompt the user to reload.
+  // Guard: if controller is null this is the first install, not an update — skip it.
+  if (navigator.serviceWorker.controller) {
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      window.dispatchEvent(new CustomEvent('sw-updated'));
+    });
+  }
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(

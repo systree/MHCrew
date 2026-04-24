@@ -7,6 +7,7 @@ import DashboardPage from './pages/DashboardPage.jsx';
 import JobDetailPage from './pages/JobDetailPage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
 import OfflineBanner from './components/OfflineBanner.jsx';
+import UpdateBanner from './components/UpdateBanner.jsx';
 import AdminRoute from './components/AdminRoute.jsx';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage.jsx';
 import PipelineSetupPage from './pages/admin/PipelineSetupPage.jsx';
@@ -39,6 +40,8 @@ export default function App() {
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       {/* Offline indicator renders on every page */}
       <OfflineBanner />
+      {/* Update prompt — shown when a new SW version has taken control */}
+      <UpdateBanner />
 
       <Routes>
         {/* Public */}
