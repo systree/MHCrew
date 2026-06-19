@@ -35,7 +35,7 @@ export default function TimeTracker({ jobId, jobStatus }) {
   const [breakElapsedSeconds, setBreakElapsedSeconds] = useState(0);
 
   // --- Summary shown after clock-out ---
-  const [summary, setSummary] = useState(null); // { totalMinutes, breakMinutes }
+  const [summary, setSummary] = useState(null); // { totalMinutes, breakMinutes, clockIn, clockOut }
 
   // --- Loading / error ---
   const [loading, setLoading] = useState(false);
@@ -70,6 +70,8 @@ export default function TimeTracker({ jobId, jobStatus }) {
               setSummary({
                 totalMinutes: last.total_minutes ?? 0,
                 breakMinutes: last.break_minutes ?? 0,
+                clockIn:  last.clock_in,
+                clockOut: last.clock_out,
               });
               setStatus('clocked_out');
             }
@@ -167,6 +169,14 @@ export default function TimeTracker({ jobId, jobStatus }) {
           )}
         </div>
 
+        {/* Start time while active */}
+        {(status === 'clocked_in' || status === 'on_break') && clockInTime && (
+          <div style={styles.timeRow}>
+            <span style={styles.timeLabel}>Started</span>
+            <span style={styles.timeValue}>{formatTime(clockInTime.toISOString())}</span>
+          </div>
+        )}
+
         {/* Break sub-timer */}
         {status === 'on_break' && (
           <div style={styles.breakTimer}>
@@ -181,8 +191,12 @@ export default function TimeTracker({ jobId, jobStatus }) {
         {/* Summary after clock-out */}
         {status === 'clocked_out' && summary && (
           <div style={styles.summaryBox}>
+            <SummaryRow label="Started"      value={formatTime(summary.clockIn)} />
+            <SummaryRow label="Ended"        value={formatTime(summary.clockOut)} />
             <SummaryRow label="Total worked" value={formatDuration(summary.totalMinutes)} />
-            <SummaryRow label="Break time" value={formatDuration(summary.breakMinutes)} />
+            {summary.breakMinutes > 0 && (
+              <SummaryRow label="Break time" value={formatDuration(summary.breakMinutes)} />
+            )}
           </div>
         )}
 
@@ -288,6 +302,11 @@ function msToMinutes(ms) {
   return Math.round(ms / 60000);
 }
 
+function formatTime(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+}
+
 function formatDuration(minutes) {
   if (!minutes) return '0m';
   const h = Math.floor(minutes / 60);
@@ -340,6 +359,24 @@ const styles = {
     fontWeight: 700,
     color: 'var(--status-completed)',
     letterSpacing: '0.04em',
+  },
+  timeRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  timeLabel: {
+    fontSize: 'var(--font-size-xs)',
+    color: 'var(--color-text-muted)',
+    fontWeight: 600,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+  },
+  timeValue: {
+    fontSize: 'var(--font-size-sm)',
+    fontWeight: 700,
+    color: 'var(--color-text)',
   },
   breakTimer: {
     display: 'flex',
