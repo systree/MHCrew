@@ -124,12 +124,13 @@ function formatAbsTime(iso) {
 // Component
 // ---------------------------------------------------------------------------
 export default function AdminActivityPage() {
-  const [entries,  setEntries]  = useState([]);
-  const [loading,  setLoading]  = useState(true);
+  const [entries,     setEntries]     = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [refreshing,  setRefreshing]  = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [error,    setError]    = useState(null);
-  const [hasMore,  setHasMore]  = useState(false);
-  const [offset,   setOffset]   = useState(0);
+  const [error,       setError]       = useState(null);
+  const [hasMore,     setHasMore]     = useState(false);
+  const [offset,      setOffset]      = useState(0);
 
   const fetchPage = useCallback(async (pageOffset, append = false) => {
     try {
@@ -148,6 +149,13 @@ export default function AdminActivityPage() {
     fetchPage(0, false).finally(() => setLoading(false));
   }, [fetchPage]);
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    setError(null);
+    await fetchPage(0, false);
+    setRefreshing(false);
+  };
+
   const handleLoadMore = async () => {
     setLoadingMore(true);
     await fetchPage(offset, true);
@@ -157,7 +165,7 @@ export default function AdminActivityPage() {
   return (
     <div className="page">
       <header className="page-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
           <Link
             to="/admin"
             style={{
@@ -175,7 +183,7 @@ export default function AdminActivityPage() {
               <polyline points="15 18 9 12 15 6" />
             </svg>
           </Link>
-          <div>
+          <div style={{ flex: 1 }}>
             <h1 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 800, color: 'var(--color-text)' }}>
               Activity Log
             </h1>
@@ -183,6 +191,32 @@ export default function AdminActivityPage() {
               Critical events across all users
             </p>
           </div>
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={refreshing || loading}
+            style={{
+              background: 'var(--color-surface-2)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-md)',
+              color: 'var(--color-text-muted)',
+              width: 36, height: 36,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0, cursor: refreshing || loading ? 'not-allowed' : 'pointer',
+              opacity: refreshing || loading ? 0.5 : 1,
+            }}
+            aria-label="Refresh activity log"
+          >
+            <svg
+              width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+              style={{ transform: refreshing ? 'rotate(360deg)' : 'none', transition: refreshing ? 'transform 0.6s linear' : 'none' }}
+            >
+              <polyline points="23 4 23 10 17 10" />
+              <polyline points="1 20 1 14 7 14" />
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+            </svg>
+          </button>
         </div>
       </header>
 
@@ -281,7 +315,7 @@ const styles = {
   },
   row: {
     display: 'flex',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 10,
     padding: '9px 0',
     borderBottom: '1px solid var(--color-border)',
@@ -301,9 +335,7 @@ const styles = {
     flex: 1,
     minWidth: 0,
     fontSize: 'var(--font-size-sm)',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
+    wordBreak: 'break-word',
   },
   label: {
     fontWeight: 600,

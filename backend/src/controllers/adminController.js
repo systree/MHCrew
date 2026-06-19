@@ -980,17 +980,39 @@ async function getActivityLog(req, res) {
   const offset = parseInt(req.query.offset ?? 0, 10);
 
   try {
-    const { data: rows, error } = await supabase
+    // Parse ACTIVITY_LOG_SHOW allowlist — comma-separated "category" or "category.action" tokens.
+    // If unset/empty, all entries are shown.
+    const showTokens = (process.env.ACTIVITY_LOG_SHOW ?? '')
+      .split(',').map((t) => t.trim()).filter(Boolean);
+
+    // Fetch entries for this location AND entries with no location_id (legacy / missing JWT location)
+    // Fetch a larger batch so JS-side filtering still returns enough results for the requested page.
+    const fetchLimit = showTokens.length ? Math.min((limit + offset) * 5, 1000) : limit;
+
+    const { data: rawRows, error } = await supabase
       .from('mh_pwa_activity_log')
-      .select('id, category, action, level, meta, user_id, created_at')
-      .eq('location_id', locationId)
+      .select('id, category, action, level, meta, user_id, location_id, created_at')
+      .or(`location_id.eq.${locationId},location_id.is.null`)
       .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+      .limit(fetchLimit);
+
+    // Apply allowlist filter in JS — exact match for "category.action" pairs,
+    // wildcard match for bare "category" tokens.
+    const rows = showTokens.length
+      ? (rawRows ?? []).filter((r) =>
+          showTokens.some((t) =>
+            t.includes('.')
+              ? t === `${r.category}.${r.action}`
+              : t === r.category
+          )
+        ).slice(offset, offset + limit)
+      : (rawRows ?? []).slice(offset, offset + limit);
 
     if (error) {
       logger.error(`getActivityLog DB error location=${locationId}: ${error.message}`);
       return res.status(500).json({ error: 'Failed to fetch activity log' });
     }
+
 
     // Resolve user names for any user_id present
     const userIds = [...new Set((rows ?? []).map((r) => r.user_id).filter(Boolean))];
@@ -1010,6 +1032,7 @@ async function getActivityLog(req, res) {
       level:      r.level,
       meta:       r.meta,
       userId:     r.user_id,
+      locationId: r.location_id,
       userName:   r.user_id ? (nameMap[r.user_id] ?? null) : null,
       createdAt:  r.created_at,
     }));

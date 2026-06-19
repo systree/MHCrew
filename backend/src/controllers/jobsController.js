@@ -141,7 +141,7 @@ async function getJobById(req, res) {
       return res.status(404).json({ error: 'Job not found' });
     }
 
-    logActivity('job', 'job_viewed', { userId, locationId, jobId: id });
+    logActivity('job', 'job_viewed', { userId, locationId: locationId ?? job.location_id, jobId: id });
     return res.json({ job });
   } catch (err) {
     logger.error(`getJobById unexpected error: ${err.message}`);
@@ -229,7 +229,8 @@ async function updateJobStatus(req, res) {
     }
 
     logger.info(`Job ${id} status updated: ${currentJob.status} → ${newStatus} by user ${userId}`);
-    logActivity('job', 'status_update', { userId, locationId, jobId: id, ghlJobId: currentJob.ghl_job_id, from: currentJob.status, to: newStatus, notes, cancellationReason });
+    const effectiveLocationId = locationId ?? updatedJob.location_id;
+    logActivity('job', 'status_update', { userId, locationId: effectiveLocationId, jobId: id, ghlJobId: currentJob.ghl_job_id, from: currentJob.status, to: newStatus, notes, cancellationReason });
 
     // ---- Push notification to admins (fire-and-forget) ----
     if (locationId) {
