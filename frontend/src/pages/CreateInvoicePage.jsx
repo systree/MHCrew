@@ -379,8 +379,8 @@ export default function CreateInvoicePage() {
                   type="number"
                   value={it.qty}
                   onChange={(e) => updateItem(i, 'qty', e.target.value)}
-                  min="0.01"
-                  step="0.01"
+                  min="0.5"
+                  step="0.5"
                   placeholder="1"
                   style={{ ...styles.input, ...styles.itemQtyInput }}
                   disabled={saving}
