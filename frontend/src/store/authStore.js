@@ -11,7 +11,7 @@ import { setTimezone } from '../utils/formatters.js';
  *   isAuthenticated — derived boolean (true when both user and token are set)
  *
  * Actions:
- *   setAuth(user, token, timezone) — called after successful login / token refresh
+ *   setAuth(user, token, timezone, locations?) — called after successful login / token refresh
  *   logout()             — clears state and removes persisted data
  */
 const useAuthStore = create(
@@ -21,19 +21,27 @@ const useAuthStore = create(
       token: null,
       timezone: 'Australia/Sydney',
       isAuthenticated: false,
+      locations: [],   // [{ locationId, companyName }] — set on login, used by profile switcher
 
-      setAuth: (user, token, timezone) => {
+      // locations param is optional — omitting it preserves the existing list
+      setAuth: (user, token, timezone, locations) => {
         // Also write the token to localStorage so the Axios interceptor can
         // read it without going through Zustand (avoids circular imports).
         localStorage.setItem('mh_token', token);
         const tz = timezone ?? 'Australia/Sydney';
         setTimezone(tz);
-        set({ user, token, timezone: tz, isAuthenticated: true });
+        set((state) => ({
+          user,
+          token,
+          timezone: tz,
+          isAuthenticated: true,
+          locations: locations ?? state.locations,
+        }));
       },
 
       logout: () => {
         localStorage.removeItem('mh_token');
-        set({ user: null, token: null, timezone: 'Australia/Sydney', isAuthenticated: false });
+        set({ user: null, token: null, timezone: 'Australia/Sydney', isAuthenticated: false, locations: [] });
       },
     }),
     {
@@ -44,6 +52,7 @@ const useAuthStore = create(
         token: state.token,
         timezone: state.timezone,
         isAuthenticated: state.isAuthenticated,
+        locations: state.locations,
       }),
       // Re-sync standalone keys after rehydration
       onRehydrateStorage: () => (state) => {

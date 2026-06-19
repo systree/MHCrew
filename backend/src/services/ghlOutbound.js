@@ -253,6 +253,12 @@ const REQUIRED_FIELDS = [
   { name: 'Item Summary',     fieldKey: 'item_summary',    dataType: 'LARGE_TEXT' },
   { name: 'Crew Notes',       fieldKey: 'crew_notes',      dataType: 'LARGE_TEXT' },
   { name: 'Job Status',       fieldKey: 'job_status',      dataType: 'TEXT'       },
+  {
+    name:            'Job Type',
+    fieldKey:        'job_type',
+    dataType:        'DROPDOWN',
+    pickListOptions: ['Door to Door', 'Depot to Depot', 'Quote'],
+  },
 ];
 
 async function provisionCustomFields(locationId) {
@@ -283,6 +289,7 @@ async function provisionCustomFields(locationId) {
           dataType:  field.dataType,
           model:     'opportunity',
           position:  0,
+          ...(field.pickListOptions ? { picklistOptions: field.pickListOptions } : {}),
         });
         result.created.push(field.fieldKey);
         logger.info(`provisionCustomFields: created "${field.name}" for location=${locationId}`);

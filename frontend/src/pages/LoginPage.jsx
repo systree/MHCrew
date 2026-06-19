@@ -58,6 +58,7 @@ export default function LoginPage() {
   const [loading, setLoading]         = useState(false);
   const [error, setError]             = useState('');
   const [resendCountdown, setCountdown] = useState(0);
+  const [locationId, setLocationId]     = useState(null);
 
   const otpRefs        = [useRef(), useRef(), useRef(), useRef(), useRef(), useRef()];
   const pinRefs        = [useRef(), useRef(), useRef(), useRef()];
@@ -146,11 +147,14 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      const { requiresPinSetup, sessionToken, user, timezone } = await verifyOtp(e164Phone, code);
+      const { requiresPinSetup, sessionToken, user, timezone, locations } = await verifyOtp(e164Phone, code);
+
+      // Store locationId so PIN login can scope its query to the right row
+      setLocationId(user?.location_id ?? null);
 
       // Pre-load the store with the session token so the protected
       // /auth/setup-pin call will have an Authorization header.
-      setAuth(user, sessionToken, timezone);
+      setAuth(user, sessionToken, timezone, locations);
 
       if (requiresPinSetup) {
         setStep(STEP.PIN_SETUP);
@@ -209,7 +213,7 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      await loginWithPin(e164Phone, code);
+      await loginWithPin(e164Phone, code, locationId);
       // Navigation handled inside useAuth
     } catch (err) {
       handleError(err);

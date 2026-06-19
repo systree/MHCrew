@@ -25,6 +25,10 @@ const {
   getNotificationSettings,
   updateNotificationSettings,
   getCrewLocations,
+  getBillingRules,
+  updateBillingRules,
+  getAdminJobEstimates,
+  getActivityLog,
 } = require('../controllers/adminController');
 
 const router = Router();
@@ -44,12 +48,16 @@ router.post('/sync-stages',    requireAuth, requireAdmin, syncStages);
 router.post('/sync-crew',      requireAuth, requireAdmin, syncCrew);
 router.post('/refresh-fields',   requireAuth, requireAdmin, refreshFields);
 router.post('/provision-fields', requireAuth, requireAdmin, provisionFields);
-router.get('/jobs',            requireAuth, requireAdmin, getJobs);
+router.get('/jobs',                      requireAuth, requireAdmin, getJobs);
+router.get('/jobs/:jobId/estimates',     requireAuth, requireAdmin, getAdminJobEstimates);
 router.get('/invoice-settings',   requireAuth,              getInvoiceSettings);
 router.patch('/invoice-settings', requireAuth, requireAdmin, updateInvoiceSettings);
 router.get('/notification-settings',   requireAuth, requireAdmin, getNotificationSettings);
 router.patch('/notification-settings', requireAuth, requireAdmin, updateNotificationSettings);
 router.get('/crew-locations',          requireAuth, requireAdmin, getCrewLocations);
+router.get('/billing-rules',           requireAuth,              getBillingRules);
+router.patch('/billing-rules',         requireAuth, requireAdmin, updateBillingRules);
+router.get('/activity',                requireAuth, requireAdmin, getActivityLog);
 
 // ---------------------------------------------------------------------------
 // POST /api/admin/refresh-fields/:locationId

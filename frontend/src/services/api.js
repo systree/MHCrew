@@ -64,11 +64,12 @@ export default api;
 
 /** Auth */
 export const authApi = {
-  sendOtp:     (phone)       => api.post('/auth/send-otp',  { phone }),
-  verifyOtp:   (phone, token) => api.post('/auth/verify-otp', { phone, token }),
-  setupPin:    (pin)          => api.post('/auth/setup-pin', { pin }),
-  loginWithPin:(phone, pin)   => api.post('/auth/login-pin', { phone, pin }),
-  getMe:       ()             => api.get('/auth/me'),
+  sendOtp:        (phone)                  => api.post('/auth/send-otp',       { phone }),
+  verifyOtp:      (phone, token)           => api.post('/auth/verify-otp',     { phone, token }),
+  setupPin:       (pin)                    => api.post('/auth/setup-pin',      { pin }),
+  loginWithPin:   (phone, pin, locationId) => api.post('/auth/login-pin',      { phone, pin, locationId }),
+  switchLocation: (locationId)             => api.post('/auth/switch-location', { locationId }),
+  getMe:          ()                       => api.get('/auth/me'),
 };
 
 /** Jobs */
@@ -102,10 +103,13 @@ export const locationsApi = {
 
 /** Invoices */
 export const invoicesApi = {
-  getInvoices:   (jobId)              => api.get(`/jobs/${jobId}/invoices`),
-  createInvoice: (jobId, data)        => api.post(`/jobs/${jobId}/invoices`, data),
-  sendInvoice:   (jobId, invoiceId)   => api.post(`/jobs/${jobId}/invoices/${invoiceId}/send`),
-  deleteInvoice: (jobId, invoiceId)   => api.delete(`/jobs/${jobId}/invoices/${invoiceId}`),
+  getInvoices:    (jobId)                       => api.get(`/jobs/${jobId}/invoices`),
+  createInvoice:  (jobId, data)                 => api.post(`/jobs/${jobId}/invoices`, data),
+  sendInvoice:    (jobId, invoiceId)            => api.post(`/jobs/${jobId}/invoices/${invoiceId}/send`),
+  deleteInvoice:  (jobId, invoiceId)            => api.delete(`/jobs/${jobId}/invoices/${invoiceId}`),
+  getEstimates:       (jobId)               => api.get(`/jobs/${jobId}/estimates`),
+  recordPayment:      (jobId, invoiceId, data) => api.post(`/jobs/${jobId}/invoices/${invoiceId}/record-payment`, data),
+  createFromEstimate: (jobId, data)         => api.post(`/jobs/${jobId}/invoices/from-estimate`, data),
 };
 
 /** Timesheets */

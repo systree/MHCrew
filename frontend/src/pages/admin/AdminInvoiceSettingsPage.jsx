@@ -15,6 +15,7 @@ export default function AdminInvoiceSettingsPage() {
   const [taxName,        setTaxName]        = useState('GST');
   const [taxRate,        setTaxRate]        = useState('10');
   const [taxCalculation, setTaxCalculation] = useState('exclusive');
+  const [showEstimates,  setShowEstimates]  = useState(false);
 
   useEffect(() => {
     getInvoiceSettings()
@@ -23,6 +24,7 @@ export default function AdminInvoiceSettingsPage() {
         setTaxName(data.taxName ?? 'GST');
         setTaxRate(String(data.taxRate ?? 10));
         setTaxCalculation(data.taxCalculation ?? 'exclusive');
+        setShowEstimates(data.showEstimates ?? false);
       })
       .catch(() => setError('Failed to load settings.'))
       .finally(() => setLoading(false));
@@ -47,6 +49,7 @@ export default function AdminInvoiceSettingsPage() {
         taxName:        taxName.trim(),
         taxRate:        rate,
         taxCalculation,
+        showEstimates,
       });
       setSuccess(true);
     } catch {
@@ -90,6 +93,25 @@ export default function AdminInvoiceSettingsPage() {
                   style={{ ...styles.toggle, ...(taxEnabled ? styles.toggleOn : styles.toggleOff) }}
                 >
                   <span style={{ ...styles.toggleThumb, transform: taxEnabled ? 'translateX(20px)' : 'translateX(2px)' }} />
+                </button>
+              </div>
+            </div>
+
+            {/* Show estimates toggle */}
+            <div className="card" style={styles.section}>
+              <div style={styles.toggleRow}>
+                <div>
+                  <p style={styles.fieldLabel}>Show Estimates to Crew</p>
+                  <p style={styles.fieldDesc}>Allows crew to view GHL estimates on the job detail page</p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={showEstimates}
+                  onClick={() => { setShowEstimates((v) => !v); setSuccess(false); }}
+                  style={{ ...styles.toggle, ...(showEstimates ? styles.toggleOn : styles.toggleOff) }}
+                >
+                  <span style={{ ...styles.toggleThumb, transform: showEstimates ? 'translateX(20px)' : 'translateX(2px)' }} />
                 </button>
               </div>
             </div>
@@ -246,13 +268,13 @@ const styles = {
     flexShrink: 0,
     transition: 'background-color 0.2s',
     padding: 0,
-    overflow: 'hidden',
   },
   toggleOn:  { backgroundColor: 'var(--color-primary)' },
   toggleOff: { backgroundColor: 'var(--color-border)' },
   toggleThumb: {
     position: 'absolute',
     top: 3,
+    left: 0,
     width: 20,
     height: 20,
     borderRadius: '50%',

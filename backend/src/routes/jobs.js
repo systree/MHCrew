@@ -3,7 +3,7 @@
 const { Router } = require('express');
 const auth = require('../middleware/auth');
 const { getMyJobs, getJobById, updateJobStatus } = require('../controllers/jobsController');
-const { getJobInvoices, createJobInvoice, sendJobInvoice, deleteJobInvoice } = require('../controllers/invoicesController');
+const { getJobInvoices, createJobInvoice, sendJobInvoice, deleteJobInvoice, getJobEstimates, recordJobPayment, createInvoiceFromEstimate } = require('../controllers/invoicesController');
 const timesheetRouter = require('./timesheets');
 
 const router = Router();
@@ -28,6 +28,15 @@ router.post('/:jobId/invoices/:invoiceId/send', auth, sendJobInvoice);
 
 // DELETE /api/jobs/:jobId/invoices/:invoiceId — delete a draft GHL invoice
 router.delete('/:jobId/invoices/:invoiceId', auth, deleteJobInvoice);
+
+// GET  /api/jobs/:jobId/estimates — fetch GHL estimates for the job's contact
+router.get('/:jobId/estimates', auth, getJobEstimates);
+
+// POST /api/jobs/:jobId/invoices/from-estimate — convert an accepted estimate to an invoice
+router.post('/:jobId/invoices/from-estimate', auth, createInvoiceFromEstimate);
+
+// POST /api/jobs/:jobId/invoices/:invoiceId/record-payment — record a manual payment
+router.post('/:jobId/invoices/:invoiceId/record-payment', auth, recordJobPayment);
 
 // Timesheet routes — POST /api/jobs/:jobId/timesheets/clock-in, etc.
 // mergeParams is set on timesheetRouter so it can read :jobId

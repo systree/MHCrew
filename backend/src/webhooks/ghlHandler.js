@@ -331,6 +331,11 @@ function buildJobPayload(opp, timezone = 'Australia/Sydney') {
   const stageName    = opp.stage?.name ?? opp.stageName ?? null;
   const mappedStatus = mapStageToStatus(stageName);
 
+  // Map GHL dropdown label → DB enum value
+  const jobTypeRaw = extractCustomField(customFields, 'opportunity.job_type', 'job_type') || null;
+  const jobTypeMap = { 'Door to Door': 'door_to_door', 'Depot to Depot': 'depot_to_depot', 'Quote': 'quote' };
+  const jobType    = jobTypeRaw ? (jobTypeMap[jobTypeRaw] ?? null) : null;
+
   return {
     ghl_job_id:       opp.id,
     ghl_contact_id:   opp.contactId ?? opp.contact_id ?? contact.id ?? null,
@@ -344,6 +349,7 @@ function buildJobPayload(opp, timezone = 'Australia/Sydney') {
     crew_notes:       crewNotes,
     // Only set status if mapped — never overwrite a crew-set status with null
     ...(mappedStatus ? { status: mappedStatus } : {}),
+    ...(jobType      ? { job_type: jobType }     : {}),
     raw_ghl_payload:  opp,
     updated_at:       new Date().toISOString(),
   };

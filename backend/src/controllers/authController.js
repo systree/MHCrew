@@ -58,21 +58,20 @@ async function getTenantTimezone(locationId) {
 }
 
 /**
- * Fetch a crew_users row by phone.
- * Returns null if not found — callers must handle this case.
+ * Fetch all active crew_users rows for a phone number.
+ * Returns an array (empty if none found).
  * Users are provisioned via GHL UserCreate webhook; we never auto-create here
  * because we wouldn't know which location_id (tenant) to assign them to.
  */
-async function getCrewUserByPhone(phone) {
+async function getCrewUsersByPhone(phone) {
   const { data, error } = await supabase
     .from('mh_pwa_crew_users')
     .select('*')
     .eq('phone', phone)
-    .eq('is_active', true)
-    .maybeSingle();
+    .eq('is_active', true);
 
   if (error) throw error;
-  return data; // null if not found
+  return data ?? [];
 }
 
 /**
@@ -223,10 +222,10 @@ async function verifyOtp(req, res) {
       .update({ used: true })
       .eq('id', tokenRow.id);
 
-    // Fetch the crew_users record — must already exist (provisioned via GHL)
-    const crewUser = await getCrewUserByPhone(phone);
+    // Fetch all active crew_users records for this phone (may span multiple locations)
+    const crewUsers = await getCrewUsersByPhone(phone);
 
-    if (!crewUser) {
+    if (crewUsers.length === 0) {
       logger.warn(`verifyOtp: no active crew account found for ${phone}`);
       logActivity('auth', 'otp_verify_failed', { phone, reason: 'no_crew_account' }, 'warn');
       return res.status(403).json({
@@ -234,18 +233,33 @@ async function verifyOtp(req, res) {
       });
     }
 
+    // Fetch company names for all locations this user belongs to
+    const locationIds = crewUsers.map(u => u.location_id);
+    const { data: tenants } = await supabase
+      .from('mh_pwa_tenants')
+      .select('location_id, company_name')
+      .in('location_id', locationIds);
+
+    const locations = crewUsers.map(u => ({
+      locationId: u.location_id,
+      companyName: tenants?.find(t => t.location_id === u.location_id)?.company_name ?? u.location_id,
+    }));
+
+    // Default to the first (oldest) location — user can switch post-login
+    const crewUser = crewUsers[0];
     const sessionToken   = signSessionToken(crewUser);
     const requiresPinSetup = !crewUser.pin_hash;
     const timezone = await getTenantTimezone(crewUser.location_id);
 
-    logger.info(`OTP verified for ${phone} location=${crewUser.location_id} — requiresPinSetup=${requiresPinSetup}`);
-    logActivity('auth', 'otp_verify_success', { userId: crewUser.id, locationId: crewUser.location_id, phone, requiresPinSetup });
+    logger.info(`OTP verified for ${phone} location=${crewUser.location_id} locations=${crewUsers.length} requiresPinSetup=${requiresPinSetup}`);
+    logActivity('auth', 'otp_verify_success', { userId: crewUser.id, locationId: crewUser.location_id, phone, requiresPinSetup, locationCount: crewUsers.length });
 
     return res.json({
       requiresPinSetup,
       sessionToken,
       timezone,
       user: publicUser(crewUser),
+      locations,
     });
   } catch (err) {
     logger.error('verifyOtp unexpected error', err);
@@ -312,14 +326,20 @@ async function loginWithPin(req, res) {
   }
 
   const { phone, pin } = { phone: phoneResult.data, pin: pinResult.data };
+  const { locationId } = req.body;
 
   try {
-    const { data: crewUser, error: fetchError } = await supabase
+    let query = supabase
       .from('mh_pwa_crew_users')
       .select('*')
       .eq('phone', phone)
-      .eq('is_active', true)
-      .maybeSingle();
+      .eq('is_active', true);
+
+    if (locationId) {
+      query = query.eq('location_id', locationId);
+    }
+
+    const { data: crewUser, error: fetchError } = await query.maybeSingle();
 
     if (fetchError) {
       logger.error(`loginWithPin DB error for ${phone}: ${fetchError.message}`);
@@ -358,6 +378,49 @@ async function loginWithPin(req, res) {
 }
 
 /**
+ * POST /auth/switch-location  (protected)
+ * Body: { locationId }
+ *
+ * Reissues a JWT scoped to a different location.
+ * The caller must already hold a valid JWT — phone is read from it.
+ * Used by the post-login company switcher in Profile settings.
+ */
+async function switchLocation(req, res) {
+  const { locationId } = req.body;
+  if (!locationId) {
+    return res.status(422).json({ error: 'locationId is required' });
+  }
+
+  const { phone } = req.user;
+
+  try {
+    const { data: crewUser, error } = await supabase
+      .from('mh_pwa_crew_users')
+      .select('*')
+      .eq('phone', phone)
+      .eq('location_id', locationId)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (error || !crewUser) {
+      logger.warn(`switchLocation: access denied phone=${phone} locationId=${locationId}`);
+      return res.status(403).json({ error: 'You do not have access to that location.' });
+    }
+
+    const sessionToken = signSessionToken(crewUser);
+    const timezone = await getTenantTimezone(crewUser.location_id);
+
+    logger.info(`switchLocation: ${phone} switched to locationId=${locationId}`);
+    logActivity('auth', 'location_switched', { userId: crewUser.id, locationId, phone });
+
+    return res.json({ sessionToken, timezone, user: publicUser(crewUser) });
+  } catch (err) {
+    logger.error('switchLocation unexpected error', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+/**
  * GET /auth/me
  * Protected — requires auth middleware
  */
@@ -388,4 +451,4 @@ async function getMe(req, res) {
   }
 }
 
-module.exports = { sendOtp, verifyOtp, setupPin, loginWithPin, getMe };
+module.exports = { sendOtp, verifyOtp, setupPin, loginWithPin, switchLocation, getMe };

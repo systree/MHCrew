@@ -432,7 +432,7 @@ async function getJobs(req, res) {
   try {
     let query = supabase
       .from('mh_pwa_jobs')
-      .select('id, ghl_job_id, status, customer_name, pickup_address, dropoff_address, scheduled_date, notes, cancellation_reason, created_at, updated_at')
+      .select('id, ghl_job_id, ghl_contact_id, status, customer_name, pickup_address, dropoff_address, scheduled_date, notes, cancellation_reason, created_at, updated_at')
       .eq('location_id', locationId)
       .order('scheduled_date', { ascending: false, nullsFirst: false });
 
@@ -467,6 +467,63 @@ async function getJobs(req, res) {
   } catch (err) {
     logger.error(`getJobs (admin) error location=${locationId}: ${err.message}`);
     return res.status(500).json({ error: 'Failed to load jobs' });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// getAdminJobEstimates — GET /api/admin/jobs/:jobId/estimates
+// Fetches all GHL estimates for the contact linked to a job (admin only).
+// ---------------------------------------------------------------------------
+async function getAdminJobEstimates(req, res) {
+  const locationId = req.user.locationId;
+  const { jobId }  = req.params;
+
+  try {
+    const { data: job, error: jobErr } = await supabase
+      .from('mh_pwa_jobs')
+      .select('id, ghl_contact_id')
+      .eq('id', jobId)
+      .eq('location_id', locationId)
+      .maybeSingle();
+
+    if (jobErr || !job) return res.status(404).json({ error: 'Job not found' });
+    if (!job.ghl_contact_id) return res.json({ estimates: [] });
+
+    const client = await getGhlClient(locationId);
+    const { data: ghlData } = await client.get('/invoices/estimate/list', {
+      headers: { Version: '2023-02-21' },
+      params: {
+        altId:     locationId,
+        altType:   'location',
+        contactId: job.ghl_contact_id,
+        limit:     10,
+        offset:    0,
+      },
+    });
+
+    const raw = ghlData?.estimates ?? ghlData?.data ?? [];
+    const estimates = raw.map((e) => ({
+      id:             e._id ?? e.id,
+      title:          e.name ?? e.title ?? null,
+      estimateNumber: e.estimateNumber ?? null,
+      prefix:         e.estimateNumberPrefix ?? 'EST-',
+      status:         e.estimateStatus ?? e.status ?? 'draft',
+      total:          e.total ?? 0,
+      issueDate:      e.issueDate ?? null,
+      expiryDate:     e.expiryDate ?? null,
+      items:          (e.items ?? []).map((li) => ({
+        name:      li.name ?? li.description ?? '',
+        qty:       li.qty ?? 1,
+        unitPrice: li.amount ?? 0,
+      })),
+    }));
+
+    logger.info(`getAdminJobEstimates: ${estimates.length} estimates for job=${jobId}`);
+    return res.json({ estimates });
+  } catch (err) {
+    if (err.status === 404) return res.json({ estimates: [] });
+    logger.error(`getAdminJobEstimates error job=${jobId}: ${err.message}`);
+    return res.status(500).json({ error: 'Failed to fetch estimates' });
   }
 }
 
@@ -584,13 +641,14 @@ async function syncStages(req, res) {
 // ---------------------------------------------------------------------------
 async function updateInvoiceSettings(req, res) {
   const locationId = req.user.locationId;
-  const { taxEnabled, taxName, taxRate, taxCalculation } = req.body;
+  const { taxEnabled, taxName, taxRate, taxCalculation, showEstimates } = req.body;
 
   const updates = { updated_at: new Date().toISOString() };
-  if (taxEnabled  !== undefined) updates.invoice_taxes_enabled     = Boolean(taxEnabled);
-  if (taxName     !== undefined) updates.invoice_tax_name          = String(taxName).trim();
-  if (taxRate     !== undefined) updates.invoice_tax_rate          = Number(taxRate);
-  if (taxCalculation !== undefined) updates.invoice_tax_calculation = String(taxCalculation);
+  if (taxEnabled     !== undefined) updates.invoice_taxes_enabled     = Boolean(taxEnabled);
+  if (taxName        !== undefined) updates.invoice_tax_name          = String(taxName).trim();
+  if (taxRate        !== undefined) updates.invoice_tax_rate          = Number(taxRate);
+  if (taxCalculation !== undefined) updates.invoice_tax_calculation   = String(taxCalculation);
+  if (showEstimates  !== undefined) updates.invoice_show_estimates    = Boolean(showEstimates);
 
   try {
     const { error } = await supabase
@@ -623,7 +681,7 @@ async function getInvoiceSettings(req, res) {
   try {
     const { data: tenant, error } = await supabase
       .from('mh_pwa_tenants')
-      .select('invoice_taxes_enabled, invoice_tax_name, invoice_tax_rate, invoice_tax_calculation')
+      .select('invoice_taxes_enabled, invoice_tax_name, invoice_tax_rate, invoice_tax_calculation, invoice_show_estimates')
       .eq('location_id', locationId)
       .maybeSingle();
 
@@ -633,10 +691,11 @@ async function getInvoiceSettings(req, res) {
     }
 
     return res.json({
-      taxEnabled:     tenant?.invoice_taxes_enabled     ?? false,
-      taxName:        tenant?.invoice_tax_name          ?? 'Tax',
-      taxRate:        Number(tenant?.invoice_tax_rate   ?? 0),
-      taxCalculation: tenant?.invoice_tax_calculation   ?? 'exclusive',
+      taxEnabled:     tenant?.invoice_taxes_enabled   ?? false,
+      taxName:        tenant?.invoice_tax_name        ?? 'Tax',
+      taxRate:        Number(tenant?.invoice_tax_rate ?? 0),
+      taxCalculation: tenant?.invoice_tax_calculation ?? 'exclusive',
+      showEstimates:  tenant?.invoice_show_estimates  ?? false,
     });
   } catch (err) {
     logger.error(`getInvoiceSettings error location=${locationId}: ${err.message}`);
@@ -842,6 +901,126 @@ async function getCrewLocations(req, res) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// getBillingRules — GET /api/admin/billing-rules
+// Returns the per-tenant billing rules config. Accessible to all auth users
+// (crew needs billing_rules_enabled + callout_minutes on CreateInvoicePage).
+// ---------------------------------------------------------------------------
+async function getBillingRules(req, res) {
+  const locationId = req.user.locationId;
+
+  try {
+    const { data: tenant, error } = await supabase
+      .from('mh_pwa_tenants')
+      .select('billing_rules_enabled, billing_callout_minutes, invoice_partial_payment_enabled')
+      .eq('location_id', locationId)
+      .maybeSingle();
+
+    if (error) {
+      logger.error(`getBillingRules DB error location=${locationId}: ${error.message}`);
+      return res.status(500).json({ error: 'Failed to fetch billing rules' });
+    }
+
+    return res.json({
+      billingRulesEnabled:      tenant?.billing_rules_enabled            ?? false,
+      calloutMinutes:           tenant?.billing_callout_minutes          ?? 30,
+      partialPaymentEnabled:    tenant?.invoice_partial_payment_enabled  ?? false,
+    });
+  } catch (err) {
+    logger.error(`getBillingRules error location=${locationId}: ${err.message}`);
+    return res.status(500).json({ error: 'Failed to fetch billing rules' });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// updateBillingRules — PATCH /api/admin/billing-rules
+// Body: { billingRulesEnabled?, calloutMinutes?, partialPaymentEnabled? }
+// ---------------------------------------------------------------------------
+async function updateBillingRules(req, res) {
+  const locationId = req.user.locationId;
+  const { billingRulesEnabled, calloutMinutes, partialPaymentEnabled } = req.body;
+
+  const updates = { updated_at: new Date().toISOString() };
+  if (billingRulesEnabled   !== undefined) updates.billing_rules_enabled           = Boolean(billingRulesEnabled);
+  if (calloutMinutes        !== undefined) updates.billing_callout_minutes          = Number(calloutMinutes);
+  if (partialPaymentEnabled !== undefined) updates.invoice_partial_payment_enabled  = Boolean(partialPaymentEnabled);
+
+  if (Object.keys(updates).length === 1) {
+    return res.status(422).json({ error: 'No valid fields provided' });
+  }
+
+  try {
+    const { error } = await supabase
+      .from('mh_pwa_tenants')
+      .update(updates)
+      .eq('location_id', locationId);
+
+    if (error) {
+      logger.error(`updateBillingRules DB error location=${locationId}: ${error.message}`);
+      return res.status(500).json({ error: 'Failed to save billing rules' });
+    }
+
+    logActivity('admin', 'billing_rules_updated', { userId: req.user.userId, locationId, updates });
+    logger.info(`updateBillingRules: updated location=${locationId}`);
+    return res.json({ ok: true });
+  } catch (err) {
+    logger.error(`updateBillingRules error location=${locationId}: ${err.message}`);
+    return res.status(500).json({ error: 'Failed to save billing rules' });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// getActivityLog — GET /api/admin/activity
+// Returns the most recent activity log entries for this location, with crew
+// member names resolved from mh_pwa_crew_users.
+// ---------------------------------------------------------------------------
+async function getActivityLog(req, res) {
+  const locationId = req.user.locationId;
+  const limit  = Math.min(parseInt(req.query.limit  ?? 50, 10), 200);
+  const offset = parseInt(req.query.offset ?? 0, 10);
+
+  try {
+    const { data: rows, error } = await supabase
+      .from('mh_pwa_activity_log')
+      .select('id, category, action, level, meta, user_id, created_at')
+      .eq('location_id', locationId)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) {
+      logger.error(`getActivityLog DB error location=${locationId}: ${error.message}`);
+      return res.status(500).json({ error: 'Failed to fetch activity log' });
+    }
+
+    // Resolve user names for any user_id present
+    const userIds = [...new Set((rows ?? []).map((r) => r.user_id).filter(Boolean))];
+    let nameMap = {};
+    if (userIds.length) {
+      const { data: crew } = await supabase
+        .from('mh_pwa_crew_users')
+        .select('id, full_name')
+        .in('id', userIds);
+      nameMap = Object.fromEntries((crew ?? []).map((c) => [c.id, c.full_name]));
+    }
+
+    const entries = (rows ?? []).map((r) => ({
+      id:         r.id,
+      category:   r.category,
+      action:     r.action,
+      level:      r.level,
+      meta:       r.meta,
+      userId:     r.user_id,
+      userName:   r.user_id ? (nameMap[r.user_id] ?? null) : null,
+      createdAt:  r.created_at,
+    }));
+
+    return res.json({ entries, limit, offset });
+  } catch (err) {
+    logger.error(`getActivityLog error location=${locationId}: ${err.message}`);
+    return res.status(500).json({ error: 'Failed to fetch activity log' });
+  }
+}
+
 module.exports = {
   requireAdmin,
   getPipelines,
@@ -862,4 +1041,8 @@ module.exports = {
   getNotificationSettings,
   updateNotificationSettings,
   getCrewLocations,
+  getBillingRules,
+  updateBillingRules,
+  getAdminJobEstimates,
+  getActivityLog,
 };

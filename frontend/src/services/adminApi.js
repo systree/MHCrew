@@ -103,6 +103,12 @@ export async function getAdminJobs(status) {
   return res.data;
 }
 
+/** GET /admin/jobs/:jobId/estimates → { estimates } */
+export async function getAdminJobEstimates(jobId) {
+  const res = await api.get(`/admin/jobs/${jobId}/estimates`);
+  return res.data;
+}
+
 /** GET /admin/notification-settings → { crewJobAssigned, adminStatusChanged, ... } */
 export async function getNotificationSettings() {
   const res = await api.get('/admin/notification-settings');
@@ -118,5 +124,25 @@ export async function updateNotificationSettings(settings) {
 /** GET /admin/crew-locations → { drivers } */
 export async function getCrewLocations() {
   const res = await api.get('/admin/crew-locations');
+  return res.data;
+}
+
+/** GET /admin/billing-rules → { billingRulesEnabled, calloutMinutes, partialPaymentEnabled } */
+export async function getBillingRules() {
+  const res = await api.get('/admin/billing-rules');
+  return res.data;
+}
+
+/** PATCH /admin/billing-rules → { ok } */
+export async function updateBillingRules(settings) {
+  const res = await api.patch('/admin/billing-rules', settings);
+  return res.data;
+}
+
+/** GET /admin/activity → { entries, limit, offset }
+ *  @param {{ limit?: number, offset?: number }} [params]
+ */
+export async function getActivityLog(params = {}) {
+  const res = await api.get('/admin/activity', { params });
   return res.data;
 }

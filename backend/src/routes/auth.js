@@ -1,6 +1,6 @@
 const { Router } = require('express');
 const auth = require('../middleware/auth');
-const { sendOtp, verifyOtp, setupPin, loginWithPin, getMe } = require('../controllers/authController');
+const { sendOtp, verifyOtp, setupPin, loginWithPin, switchLocation, getMe } = require('../controllers/authController');
 
 const router = Router();
 
@@ -15,6 +15,9 @@ router.post('/setup-pin', auth, setupPin);
 
 // POST /auth/login-pin  — PIN-based login for returning crew
 router.post('/login-pin', loginWithPin);
+
+// POST /auth/switch-location  — reissue JWT for a different location (protected)
+router.post('/switch-location', auth, switchLocation);
 
 // GET /auth/me  — return current crew member (protected)
 router.get('/me', auth, getMe);

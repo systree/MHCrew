@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getAdminJobs } from '../../services/adminApi.js';
+import { getAdminJobs, getAdminJobEstimates } from '../../services/adminApi.js';
 import BottomNav from '../../components/BottomNav.jsx';
-import { formatDateTime } from '../../utils/formatters.js';
+import { formatDateTime, formatCurrency, formatDate } from '../../utils/formatters.js';
 
 const STATUS_FILTERS = ['All', 'assigned', 'enroute', 'arrived', 'in_progress', 'completed', 'cancelled'];
 
@@ -158,9 +158,51 @@ export default function AdminJobsPage() {
   );
 }
 
+const EST_STATUS_LABELS = {
+  draft:    'Draft',
+  sent:     'Sent',
+  accepted: 'Accepted',
+  declined: 'Declined',
+  expired:  'Expired',
+  invoiced: 'Invoiced',
+};
+
+const EST_STATUS_STYLES = {
+  draft:    { backgroundColor: 'rgba(136,136,170,0.12)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' },
+  sent:     { backgroundColor: 'rgba(59,130,246,0.12)',  color: '#60a5fa',                 border: '1px solid rgba(59,130,246,0.3)' },
+  accepted: { backgroundColor: 'rgba(34,197,94,0.12)',   color: '#4ade80',                 border: '1px solid rgba(34,197,94,0.25)' },
+  declined: { backgroundColor: 'rgba(239,68,68,0.12)',   color: '#f87171',                 border: '1px solid rgba(239,68,68,0.3)' },
+  expired:  { backgroundColor: 'rgba(136,136,170,0.12)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' },
+  invoiced: { backgroundColor: 'rgba(139,92,246,0.12)',  color: '#a78bfa',                 border: '1px solid rgba(139,92,246,0.3)' },
+  default:  { backgroundColor: 'rgba(136,136,170,0.12)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' },
+};
+
 function JobCard({ job }) {
   const colors = STATUS_COLORS[job.status] ?? STATUS_COLORS.assigned;
-  const date = job.scheduled_date ? formatDateTime(job.scheduled_date) : null;
+  const date   = job.scheduled_date ? formatDateTime(job.scheduled_date) : null;
+
+  const [estimatesVisible,  setEstimatesVisible]  = useState(false);
+  const [estimates,         setEstimates]         = useState([]);
+  const [estimatesLoading,  setEstimatesLoading]  = useState(false);
+  const [estimatesFetched,  setEstimatesFetched]  = useState(false);
+  const [expandedEstimate,  setExpandedEstimate]  = useState(null);
+
+  const handleToggleEstimates = useCallback(async () => {
+    const next = !estimatesVisible;
+    setEstimatesVisible(next);
+    if (next && !estimatesFetched) {
+      setEstimatesLoading(true);
+      try {
+        const data = await getAdminJobEstimates(job.id);
+        setEstimates(data?.estimates ?? []);
+      } catch {
+        setEstimates([]);
+      } finally {
+        setEstimatesLoading(false);
+        setEstimatesFetched(true);
+      }
+    }
+  }, [estimatesVisible, estimatesFetched, job.id]);
 
   return (
     <div className="card" style={styles.jobCard}>
@@ -221,6 +263,114 @@ function JobCard({ job }) {
       {/* Cancellation reason */}
       {job.cancellation_reason && (
         <p style={styles.cancelReason}>Reason: {job.cancellation_reason}</p>
+      )}
+
+      {/* Estimates toggle — only for jobs with a GHL contact */}
+      {job.ghl_contact_id !== null && (
+        <button type="button" onClick={handleToggleEstimates} style={styles.estimatesToggleBtn}>
+          {estimatesLoading ? (
+            <>
+              <span style={styles.spinner} />
+              Loading estimates…
+            </>
+          ) : (
+            <>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="8" y1="13" x2="16" y2="13" />
+                <line x1="8" y1="17" x2="16" y2="17" />
+              </svg>
+              {estimatesVisible
+                ? 'Hide Estimates'
+                : `Show Estimates${estimatesFetched && estimates.length > 0 ? ` (${estimates.length})` : ''}`}
+              <svg
+                width="11" height="11" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2.5"
+                strokeLinecap="round" strokeLinejoin="round"
+                style={{ transition: 'transform 0.2s', transform: estimatesVisible ? 'rotate(180deg)' : 'none' }}
+                aria-hidden="true"
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </>
+          )}
+        </button>
+      )}
+
+      {/* Estimates list */}
+      {estimatesVisible && !estimatesLoading && (
+        estimatesFetched && estimates.length === 0 ? (
+          <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center', padding: '4px 0' }}>
+            No estimates found.
+          </p>
+        ) : (
+          <div style={styles.estimatesList}>
+            {estimates.map((est) => {
+              const isExpanded  = expandedEstimate === est.id;
+              const statusStyle = EST_STATUS_STYLES[est.status] ?? EST_STATUS_STYLES.default;
+              return (
+                <div key={est.id} style={styles.estimateItem}>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedEstimate(isExpanded ? null : est.id)}
+                    style={styles.estimateRow}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-text)' }}>
+                        {est.estimateNumber ? `${est.prefix ?? 'EST-'}${est.estimateNumber}` : (est.title ?? 'Estimate')}
+                      </span>
+                      {est.estimateNumber && est.title && (
+                        <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginTop: 1 }}>{est.title}</p>
+                      )}
+                      {est.issueDate && (
+                        <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-dim)', marginTop: 1 }}>
+                          {formatDate(est.issueDate)}
+                          {est.expiryDate && ` · Expires ${formatDate(est.expiryDate)}`}
+                        </p>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                      <span style={{ ...styles.estStatusBadge, ...statusStyle }}>
+                        {EST_STATUS_LABELS[est.status] ?? est.status}
+                      </span>
+                      <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text)' }}>
+                        {formatCurrency(est.total)}
+                      </span>
+                      <svg
+                        width="11" height="11" viewBox="0 0 24 24" fill="none"
+                        stroke="var(--color-text-dim)" strokeWidth="2.5"
+                        strokeLinecap="round" strokeLinejoin="round"
+                        style={{ transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'none' }}
+                        aria-hidden="true"
+                      >
+                        <polyline points="6 9 12 15 18 9" />
+                      </svg>
+                    </div>
+                  </button>
+                  {isExpanded && est.items?.length > 0 && (
+                    <div style={styles.estimateDetail}>
+                      {est.items.map((li, i) => (
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                          <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text)' }}>
+                            {li.name}{li.qty !== 1 ? ` × ${li.qty}` : ''}
+                          </span>
+                          <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-text)', flexShrink: 0 }}>
+                            {formatCurrency(li.unitPrice * li.qty)}
+                          </span>
+                        </div>
+                      ))}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 6, borderTop: '1px solid var(--color-border)', marginTop: 4 }}>
+                        <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Total</span>
+                        <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--color-text)' }}>{formatCurrency(est.total)}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )
       )}
     </div>
   );
@@ -382,5 +532,72 @@ const styles = {
     fontSize: 'var(--font-size-xs)',
     color: '#f87171',
     fontStyle: 'italic',
+  },
+  estimatesToggleBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    background: 'none',
+    border: '1px solid var(--color-border)',
+    borderRadius: 'var(--radius-md)',
+    color: 'var(--color-text-muted)',
+    fontSize: 'var(--font-size-xs)',
+    fontWeight: 600,
+    padding: '6px 10px',
+    cursor: 'pointer',
+    alignSelf: 'flex-start',
+  },
+  spinner: {
+    display: 'inline-block',
+    width: 11,
+    height: 11,
+    border: '2px solid var(--color-border)',
+    borderTopColor: 'var(--color-primary)',
+    borderRadius: '50%',
+    animation: 'spin 0.7s linear infinite',
+  },
+  estimatesList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+    borderTop: '1px solid var(--color-border)',
+    paddingTop: 8,
+    marginTop: 2,
+  },
+  estimateItem: {
+    borderRadius: 'var(--radius-md)',
+    backgroundColor: 'var(--color-surface-2)',
+    border: '1px solid var(--color-border)',
+    overflow: 'hidden',
+  },
+  estimateRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    width: '100%',
+    padding: '8px 10px',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    textAlign: 'left',
+    color: 'inherit',
+  },
+  estStatusBadge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    padding: '1px 7px',
+    borderRadius: 'var(--radius-full)',
+    fontSize: '10px',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    flexShrink: 0,
+  },
+  estimateDetail: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+    padding: '0 10px 10px',
+    borderTop: '1px solid var(--color-border)',
   },
 };

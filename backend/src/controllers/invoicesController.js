@@ -4,6 +4,7 @@ const supabase             = require('../services/supabase');
 const { getGhlClient }     = require('../services/ghl');
 const { retryWithBackoff } = require('../utils/retry');
 const logger               = require('../utils/logger');
+const { logActivity }      = require('../utils/logger');
 const { notifyAdmins, getNotificationSettings } = require('../services/pushService');
 
 // ---------------------------------------------------------------------------
@@ -265,6 +266,7 @@ async function createJobInvoice(req, res) {
 
     const createdInvoiceId = ghlData?.invoice?._id ?? ghlData?.invoice?.id ?? ghlData?._id ?? null;
     await logOutbound('invoice.create', { jobId, locationId, contactId: job.ghl_contact_id }, 'success', locationId);
+    logActivity('invoice', 'invoice_created', { userId, locationId, jobId, invoiceId: createdInvoiceId, title: title.trim() });
     logger.info(`createJobInvoice: created invoice=${createdInvoiceId} for job=${jobId} contact=${job.ghl_contact_id}`);
 
     // Immediately send the invoice — crew should never have to do this as a separate step
@@ -383,6 +385,7 @@ async function sendJobInvoice(req, res) {
     );
 
     await logOutbound('invoice.send', { jobId, invoiceId, locationId }, 'success', locationId);
+    logActivity('invoice', 'invoice_sent', { userId, locationId, jobId, invoiceId });
     logger.info(`sendJobInvoice: sent invoice=${invoiceId} for job=${jobId}`);
 
     // Push notification to admins (fire-and-forget)
@@ -449,6 +452,7 @@ async function deleteJobInvoice(req, res) {
     );
 
     await logOutbound('invoice.delete', { jobId, invoiceId, locationId }, 'success', locationId);
+    logActivity('invoice', 'invoice_deleted', { userId, locationId, jobId, invoiceId });
     logger.info(`deleteJobInvoice: deleted invoice=${invoiceId} for job=${jobId}`);
 
     // Push notification to admins (fire-and-forget)
@@ -488,4 +492,257 @@ async function deleteJobInvoice(req, res) {
   }
 }
 
-module.exports = { getJobInvoices, createJobInvoice, sendJobInvoice, deleteJobInvoice };
+// ---------------------------------------------------------------------------
+// createInvoiceFromEstimate
+// POST /api/jobs/:jobId/invoices/from-estimate
+// Converts an accepted GHL estimate into a GHL invoice, then auto-sends it.
+// ---------------------------------------------------------------------------
+async function createInvoiceFromEstimate(req, res) {
+  const userId     = req.user.userId;
+  const locationId = req.user.locationId;
+  const { jobId }  = req.params;
+  const { estimateId, dueDate } = req.body;
+
+  if (!estimateId) {
+    return res.status(422).json({ error: 'estimateId is required' });
+  }
+
+  try {
+    const { data: assignment } = await supabase
+      .from('mh_pwa_job_crew_assignments')
+      .select('job_id')
+      .eq('job_id', jobId)
+      .eq('crew_user_id', userId)
+      .maybeSingle();
+
+    if (!assignment) {
+      return res.status(404).json({ error: 'Job not found or not assigned to you' });
+    }
+
+    const client    = await getGhlClient(locationId);
+    const issueDate = new Date().toISOString().slice(0, 10);
+
+    // GHL requires estimateStatus=accepted before conversion — auto-accept if not already
+    logger.info(`createInvoiceFromEstimate: accepting estimate=${estimateId}`);
+    await client.put(`/invoices/estimate/${estimateId}`, {
+      altId:          locationId,
+      altType:        'location',
+      estimateStatus: 'accepted',
+    }, {
+      headers: { Version: '2023-02-21' },
+    });
+
+    const { data: ghlData } = await retryWithBackoff(() =>
+      client.post(`/invoices/estimate/${estimateId}/invoice`, {
+        altId:          locationId,
+        altType:        'location',
+        markAsInvoiced: true,
+        version:        'v2',
+        issueDate,
+        ...(dueDate ? { dueDate } : {}),
+      }, {
+        headers: { Version: '2023-02-21' },
+      })
+    );
+
+    const inv               = ghlData?.invoice ?? ghlData ?? {};
+    const createdInvoiceId  = inv._id ?? inv.id ?? null;
+
+    await logOutbound('invoice.from_estimate', { jobId, estimateId, locationId }, 'success', locationId);
+    logActivity('invoice', 'invoice_from_estimate', { userId, locationId, jobId, estimateId, invoiceId: createdInvoiceId });
+    logger.info(`createInvoiceFromEstimate: created invoice=${createdInvoiceId} from estimate=${estimateId} job=${jobId}`);
+
+    // Auto-send
+    if (createdInvoiceId) {
+      const { data: crewUserRes } = await supabase
+        .from('mh_pwa_crew_users')
+        .select('ghl_user_id')
+        .eq('id', userId)
+        .maybeSingle();
+      const ghlUserId = crewUserRes?.ghl_user_id ?? null;
+
+      try {
+        await retryWithBackoff(() =>
+          client.post(`/invoices/${createdInvoiceId}/send`, {
+            altId:    locationId,
+            altType:  'location',
+            action:   'sms_and_email',
+            liveMode: true,
+            ...(ghlUserId ? { userId: ghlUserId } : {}),
+          })
+        );
+        logger.info(`createInvoiceFromEstimate: auto-sent invoice=${createdInvoiceId}`);
+      } catch (sendErr) {
+        logger.error(`createInvoiceFromEstimate: auto-send failed for invoice=${createdInvoiceId}: ${sendErr.message}`);
+      }
+    }
+
+    return res.status(201).json({
+      invoice: {
+        id:        inv._id ?? inv.id,
+        title:     inv.name ?? inv.title ?? null,
+        status:    inv.status ?? 'draft',
+        total:     inv.total ?? 0,
+        amountDue: inv.amountDue ?? inv.amount_due ?? 0,
+        issueDate: inv.issueDate ?? issueDate,
+      },
+    });
+  } catch (err) {
+    await logOutbound('invoice.from_estimate', { jobId, estimateId, locationId }, 'failed', locationId, err.message);
+    logger.error(`createInvoiceFromEstimate error job=${jobId}: ${err.message}`);
+    return res.status(500).json({ error: 'Failed to create invoice from estimate' });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// getJobEstimates
+// GET /api/jobs/:jobId/estimates
+// Fetches non-draft GHL estimates for the contact linked to this job.
+// ---------------------------------------------------------------------------
+async function getJobEstimates(req, res) {
+  const userId     = req.user.userId;
+  const locationId = req.user.locationId;
+  const { jobId }  = req.params;
+
+  try {
+    const { data: assignment } = await supabase
+      .from('mh_pwa_job_crew_assignments')
+      .select('job_id')
+      .eq('job_id', jobId)
+      .eq('crew_user_id', userId)
+      .maybeSingle();
+
+    if (!assignment) {
+      return res.status(404).json({ error: 'Job not found or not assigned to you' });
+    }
+
+    const jobQuery = supabase
+      .from('mh_pwa_jobs')
+      .select('id, ghl_contact_id')
+      .eq('id', jobId);
+    if (locationId) jobQuery.eq('location_id', locationId);
+
+    const { data: job, error: jobErr } = await jobQuery.maybeSingle();
+    if (jobErr || !job) return res.status(404).json({ error: 'Job not found' });
+    if (!job.ghl_contact_id) return res.json({ estimates: [] });
+
+    const client = await getGhlClient(locationId);
+    const { data: ghlData } = await client.get('/invoices/estimate/list', {
+      headers: { Version: '2023-02-21' },
+      params: {
+        altId:     locationId,
+        altType:   'location',
+        contactId: job.ghl_contact_id,
+        limit:     10,
+        offset:    0,
+      },
+    });
+
+    const raw = ghlData?.estimates ?? ghlData?.data ?? [];
+    const estimates = raw.map((e) => ({
+      id:             e._id ?? e.id,
+      title:          e.name ?? e.title ?? null,
+      estimateNumber: e.estimateNumber ?? null,
+      prefix:         e.estimateNumberPrefix ?? 'EST-',
+      status:         e.estimateStatus ?? e.status ?? 'draft',
+      total:          e.total ?? 0,
+      issueDate:      e.issueDate ?? null,
+      expiryDate:     e.expiryDate ?? null,
+      items:          (e.items ?? []).map((li) => ({
+        name:      li.name ?? li.description ?? '',
+        qty:       li.qty ?? 1,
+        unitPrice: li.amount ?? 0,
+      })),
+    }));
+
+    logger.info(`getJobEstimates: ${estimates.length} estimates for job=${jobId}`);
+    return res.json({ estimates });
+  } catch (err) {
+    if (err.status === 404) return res.json({ estimates: [] });
+    logger.error(`getJobEstimates error job=${jobId}: ${err.message}`);
+    return res.status(500).json({ error: 'Failed to fetch estimates' });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// recordJobPayment
+// POST /api/jobs/:jobId/invoices/:invoiceId/record-payment
+// Records a manual payment against a GHL invoice.
+// ---------------------------------------------------------------------------
+async function recordJobPayment(req, res) {
+  const userId     = req.user.userId;
+  const locationId = req.user.locationId;
+  const { jobId, invoiceId } = req.params;
+  const { amount, notes }    = req.body;
+
+  if (!amount || Number(amount) <= 0) {
+    return res.status(422).json({ error: 'amount is required and must be positive' });
+  }
+
+  try {
+    // Allow crew assigned to this job OR any admin
+    if (req.user.role !== 'admin') {
+      const { data: assignment } = await supabase
+        .from('mh_pwa_job_crew_assignments')
+        .select('job_id')
+        .eq('job_id', jobId)
+        .eq('crew_user_id', userId)
+        .maybeSingle();
+
+      if (!assignment) {
+        return res.status(404).json({ error: 'Job not found or not assigned to you' });
+      }
+    }
+
+    const client = await getGhlClient(locationId);
+    const paymentDate = new Date().toISOString().slice(0, 10);
+
+    await retryWithBackoff(() =>
+      client.post(`/invoices/${invoiceId}/record-payment`, {
+        altId:         locationId,
+        altType:       'location',
+        amount:        Number(amount),
+        paymentMethod: 'manual',
+        paymentDate,
+        notes:         notes ?? 'Payment confirmed by crew',
+      })
+    );
+
+    await logOutbound('invoice.record_payment', { jobId, invoiceId, locationId, amount }, 'success', locationId);
+    logActivity('invoice', 'payment_recorded', { userId, locationId, jobId, invoiceId, amount: Number(amount) });
+    logger.info(`recordJobPayment: recorded payment amount=${amount} invoice=${invoiceId} job=${jobId}`);
+
+    // Push notification to admins (fire-and-forget)
+    if (locationId) {
+      (async () => {
+        try {
+          const settings = await getNotificationSettings(locationId);
+          if (settings.adminInvoiceCreated) {
+            const { data: actor } = await supabase
+              .from('mh_pwa_crew_users')
+              .select('full_name')
+              .eq('id', userId)
+              .maybeSingle();
+            const crewName = actor?.full_name ?? 'A crew member';
+            await notifyAdmins(locationId, {
+              title: 'Payment Recorded',
+              body:  `${crewName} recorded a payment of $${Number(amount).toFixed(2)}`,
+              url:   `/admin/jobs`,
+              tag:   `payment-${invoiceId}`,
+            });
+          }
+        } catch (err) {
+          logger.error(`Record payment push notification failed: ${err.message}`);
+        }
+      })();
+    }
+
+    return res.json({ success: true });
+  } catch (err) {
+    await logOutbound('invoice.record_payment', { jobId, invoiceId, locationId }, 'failed', locationId, err.message);
+    logger.error(`recordJobPayment error job=${jobId} invoice=${invoiceId}: ${err.message}`);
+    return res.status(500).json({ error: 'Failed to record payment' });
+  }
+}
+
+module.exports = { getJobInvoices, createJobInvoice, sendJobInvoice, deleteJobInvoice, getJobEstimates, recordJobPayment, createInvoiceFromEstimate };

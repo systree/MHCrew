@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { jobsApi, invoicesApi, timesheetApi } from '../services/api.js';
-import { getInvoiceSettings } from '../services/adminApi.js';
+import { getInvoiceSettings, getBillingRules } from '../services/adminApi.js';
 import { formatCurrency } from '../utils/formatters.js';
 import BottomNav from '../components/BottomNav.jsx';
+
+const JOB_TYPE_LABELS = { door_to_door: 'Door to Door', depot_to_depot: 'Depot to Depot', quote: 'Quote' };
 
 function formatDuration(totalMinutes) {
   const h = Math.floor(totalMinutes / 60);
@@ -28,17 +30,26 @@ export default function CreateInvoicePage() {
   const [error,   setError]   = useState(null);
   const [tax,     setTax]     = useState(null); // { taxEnabled, taxName, taxRate }
 
-  // Load job + timesheets in parallel
+  // Billing rules
+  const [billingRules, setBillingRules] = useState(null); // { billingRulesEnabled, calloutMinutes }
+  const [estimates,    setEstimates]    = useState([]);    // GHL estimates for quote jobs
+
+  // Billing-rules helper inputs (door-to-door / depot-to-depot modes)
+  const [workHours,    setWorkHours]    = useState('');
+  const [hourlyRate,   setHourlyRate]   = useState('');
+
+  // Load job + timesheets + settings in parallel
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
       setLoadError(null);
       try {
-        const [jobRes, tsRes, taxRes] = await Promise.allSettled([
+        const [jobRes, tsRes, taxRes, rulesRes] = await Promise.allSettled([
           jobsApi.getJobById(id),
           timesheetApi.getTimesheets(id),
           getInvoiceSettings(),
+          getBillingRules(),
         ]);
 
         if (cancelled) return;
@@ -55,8 +66,19 @@ export default function CreateInvoicePage() {
 
         if (taxRes.status === 'fulfilled') setTax(taxRes.value);
 
-        // Time suggestion: only when completed and timesheets exist
-        if (loadedJob.status === 'completed' && tsRes.status === 'fulfilled') {
+        const rules = rulesRes.status === 'fulfilled' ? rulesRes.value : null;
+        if (rules) setBillingRules(rules);
+
+        // Always fetch estimates — accepted ones surface a "Create from Estimate" shortcut
+        invoicesApi.getEstimates(id)
+          .then(({ data }) => { if (!cancelled) setEstimates(data?.estimates ?? []); })
+          .catch(() => {});
+
+        // Time suggestion: only when completed and timesheets exist AND no billing mode active
+        const billingActive = rules?.billingRulesEnabled &&
+          ['door_to_door', 'depot_to_depot'].includes(loadedJob.job_type);
+
+        if (!billingActive && loadedJob.status === 'completed' && tsRes.status === 'fulfilled') {
           const timesheets = tsRes.value.data?.timesheets ?? [];
           const totalMinutes = timesheets.reduce((sum, t) => sum + (t.total_minutes ?? 0), 0);
           if (totalMinutes > 0) {
@@ -83,6 +105,55 @@ export default function CreateInvoicePage() {
   const removeItem = useCallback((index) => {
     setItems((prev) => prev.filter((_, i) => i !== index));
   }, []);
+
+  // Determine billing mode
+  const jobType        = job?.job_type ?? null;
+  const billingEnabled = billingRules?.billingRulesEnabled && jobType;
+  const calloutMins    = billingRules?.calloutMinutes ?? 30;
+  const calloutHours   = calloutMins / 60;
+
+  // Sync line items from billing-rules helper inputs when in door_to_door / depot_to_depot mode
+  const billingItems = useCallback(() => {
+    const hrs  = parseFloat(workHours)  || 0;
+    const rate = parseFloat(hourlyRate) || 0;
+    if (!hrs || !rate) return null;
+
+    if (jobType === 'door_to_door') {
+      const workTotal    = hrs * rate;
+      const calloutTotal = calloutHours * rate;
+      return [
+        { name: `Moving Service (${hrs}h)`,                  qty: '1', unitPrice: String(workTotal.toFixed(2)) },
+        { name: `Callout Charge (${calloutMins} min)`,        qty: '1', unitPrice: String(calloutTotal.toFixed(2)) },
+      ];
+    }
+    if (jobType === 'depot_to_depot') {
+      return [
+        { name: `Moving Service (${hrs}h)`, qty: '1', unitPrice: String((hrs * rate).toFixed(2)) },
+      ];
+    }
+    return null;
+  }, [jobType, workHours, hourlyRate, calloutHours, calloutMins]);
+
+  // Apply billing helper items when inputs change
+  useEffect(() => {
+    if (!billingEnabled) return;
+    if (jobType !== 'door_to_door' && jobType !== 'depot_to_depot') return;
+    const computed = billingItems();
+    if (computed) setItems(computed);
+  }, [billingEnabled, jobType, billingItems]);
+
+  // Create from estimate handler
+  const handleCreateFromEstimate = useCallback(async (estimateId) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await invoicesApi.createFromEstimate(id, { estimateId, ...(dueDate ? { dueDate } : {}) });
+      navigate(`/jobs/${id}`, { state: { invoiceCreated: true } });
+    } catch (err) {
+      setError(err.response?.data?.error ?? 'Failed to create invoice from estimate.');
+      setSaving(false);
+    }
+  }, [id, dueDate, navigate]);
 
   const subtotal = items.reduce((sum, it) => {
     const qty   = parseFloat(it.qty)       || 0;
@@ -186,6 +257,18 @@ export default function CreateInvoicePage() {
 
           {/* Invoice title */}
           <div className="card" style={styles.section}>
+            {jobType && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <span style={{
+                  fontSize: 'var(--font-size-xs)', fontWeight: 700, letterSpacing: '0.04em',
+                  padding: '2px 8px', borderRadius: 'var(--radius-full)',
+                  backgroundColor: 'rgba(139,92,246,0.12)', color: '#a78bfa',
+                  border: '1px solid rgba(139,92,246,0.25)',
+                }}>
+                  {JOB_TYPE_LABELS[jobType] ?? jobType}
+                </span>
+              </div>
+            )}
             <label style={styles.label}>Invoice Title</label>
             <input
               type="text"
@@ -196,6 +279,79 @@ export default function CreateInvoicePage() {
               disabled={saving}
             />
           </div>
+
+          {/* Accepted estimate → show convert shortcut for any job type */}
+          {estimates.filter((e) => e.status === 'accepted').length > 0 && (
+            <div className="card" style={styles.section}>
+              <p style={styles.sectionHeader}>Accepted Estimate</p>
+              {estimates.filter((e) => e.status === 'accepted').map((est) => (
+                <div key={est.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <div>
+                    <p style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--color-text)' }}>
+                      {est.title ?? 'Estimate'}
+                    </p>
+                    <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginTop: 2 }}>
+                      {formatCurrency(est.total)} · Accepted
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={saving}
+                    onClick={() => handleCreateFromEstimate(est.id)}
+                    style={{ fontSize: 'var(--font-size-xs)', padding: '7px 14px', flexShrink: 0 }}
+                  >
+                    {saving ? <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} /> : 'Create from Estimate'}
+                  </button>
+                </div>
+              ))}
+              <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-dim)', marginTop: -4 }}>
+                Or fill in the form below for a manual invoice.
+              </p>
+            </div>
+          )}
+
+          {/* Billing helper — door to door / depot to depot */}
+          {billingEnabled && (jobType === 'door_to_door' || jobType === 'depot_to_depot') && (
+            <div className="card" style={styles.section}>
+              <p style={styles.sectionHeader}>
+                {jobType === 'door_to_door' ? 'Door to Door Billing' : 'Depot to Depot Billing'}
+              </p>
+              {jobType === 'door_to_door' && (
+                <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginTop: -4, lineHeight: 1.4 }}>
+                  Enter work hours. A {calloutMins}-minute callout charge will be added automatically.
+                </p>
+              )}
+              <div style={{ display: 'flex', gap: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ ...styles.label, display: 'block', marginBottom: 4 }}>Work Hours</label>
+                  <input
+                    type="number"
+                    value={workHours}
+                    onChange={(e) => setWorkHours(e.target.value)}
+                    min="0"
+                    step="0.25"
+                    placeholder="e.g. 3"
+                    style={styles.input}
+                    disabled={saving}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ ...styles.label, display: 'block', marginBottom: 4 }}>Hourly Rate ($)</label>
+                  <input
+                    type="number"
+                    value={hourlyRate}
+                    onChange={(e) => setHourlyRate(e.target.value)}
+                    min="0"
+                    step="1"
+                    placeholder="e.g. 220"
+                    style={styles.input}
+                    disabled={saving}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Line items */}
           <div className="card" style={styles.section}>
