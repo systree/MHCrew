@@ -75,7 +75,7 @@ html {
 
 body {
   font-family: var(--font-family);
-  background-color: var(--color-bg);
+  background-color: #000;
   color: var(--color-text);
   line-height: 1.5;
   min-height: 100dvh;
@@ -88,6 +88,10 @@ body {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
+  max-width: 480px;
+  margin: 0 auto;
+  background-color: var(--color-bg);
+  position: relative;
 }
 
 /* ---- Typography ---- */
@@ -336,6 +340,16 @@ button:disabled {
   }
 }
 
+/* Constrain fixed-position elements to the app column on desktop */
+.offline-banner,
+.bottom-nav-fixed {
+  max-width: 480px;
+  left: 50% !important;
+  right: auto !important;
+  transform: translateX(-50%);
+  width: 100%;
+}
+
 /**
  * .offline-banner
  * Base class for the fixed top banner.  Background colour is set inline
@@ -345,8 +359,8 @@ button:disabled {
 .offline-banner {
   position: fixed;
   top: 0;
-  left: 0;
-  right: 0;
+  left: 50%;
+  right: auto;
   z-index: 9999;
   display: flex;
   align-items: center;

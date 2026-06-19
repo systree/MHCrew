@@ -41,8 +41,11 @@ export default function UpdateBanner() {
 const bannerStyle = {
   position:        'fixed',
   bottom:          'calc(64px + env(safe-area-inset-bottom))',
-  left:            0,
-  right:           0,
+  left:            '50%',
+  right:           'auto',
+  transform:       'translateX(-50%)',
+  width:           '100%',
+  maxWidth:        480,
   zIndex:          9998,
   display:         'flex',
   alignItems:      'center',

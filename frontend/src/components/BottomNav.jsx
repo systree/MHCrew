@@ -56,6 +56,7 @@ export default function BottomNav() {
   return (
     <nav
       aria-label="Main navigation"
+      className="bottom-nav-fixed"
       style={{
         position: 'fixed',
         bottom: 0,
