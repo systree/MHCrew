@@ -309,7 +309,7 @@ button:disabled {
 .mt-md        { margin-top: var(--spacing-md); }
 .mt-lg        { margin-top: var(--spacing-lg); }
 
-/* ---- Scrollbar (desktop preview) ---- */
+/* ---- Scrollbar (desktop preview only) ---- */
 
 ::-webkit-scrollbar {
   width: 6px;
@@ -322,6 +322,12 @@ button:disabled {
 ::-webkit-scrollbar-thumb {
   background: var(--color-border);
   border-radius: var(--radius-full);
+}
+
+/* Hide scrollbars when running as installed PWA */
+@media (display-mode: standalone) {
+  ::-webkit-scrollbar { display: none; }
+  * { scrollbar-width: none; -ms-overflow-style: none; }
 }
 
 /* ============================================================
