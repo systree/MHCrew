@@ -161,13 +161,20 @@ async function getFieldKeyMap(locationId) {
     return Object.fromEntries(rows.map((r) => [r.field_id, r.field_key]));
   }
 
-  // --- Fetch from GHL API and persist ---
+  // --- Fetch from GHL API and persist (opportunity + contact models) ---
   try {
     const client = await getGhlClient(locationId);
-    const { data } = await client.get(`/locations/${locationId}/customFields`, {
-      params: { model: 'opportunity' },
-    });
-    const fields = data?.customFields ?? [];
+    const MODELS = ['opportunity', 'contact'];
+
+    const fields = [];
+    for (const model of MODELS) {
+      const { data } = await client.get(`/locations/${locationId}/customFields`, {
+        params: { model },
+      });
+      for (const f of (data?.customFields ?? [])) {
+        fields.push({ ...f, _model: model });
+      }
+    }
 
     if (!fields.length) {
       logger.warn(`getFieldKeyMap: GHL returned no custom fields for location=${locationId}`);
@@ -181,6 +188,7 @@ async function getFieldKeyMap(locationId) {
         field_id:    f.id,
         field_key:   f.fieldKey,
         field_label: f.name ?? null,
+        model:       f._model,
         updated_at:  new Date().toISOString(),
       }));
 

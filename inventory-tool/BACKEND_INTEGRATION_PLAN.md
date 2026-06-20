@@ -92,19 +92,74 @@ Each location must have the "Moving Inventory" field before writing. Reuse the e
 mapping: ensure the field exists for the location, cache its id, then write. No new
 machinery — reuse the established pattern.
 
-## 6. Link generation (operator side)
+## 6. Link generation + delivery (two-workflow design)
 
-The token must be minted server-side, so GHL can't build it alone. Cleanest automated
-flow:
+A GHL workflow can't mint the signed token itself, so the backend mints it and writes the
+URL onto the contact. Delivery is split into **two separate GHL workflows** so there is no
+timing race (the link is written at opportunity creation, long before it is sent):
 
-- A **GHL workflow** fires a webhook to a secured backend endpoint
-  `POST /api/inventory/issue-link` (shared-key protected) with `contactId` + `locationId`.
-- Backend mints the token, builds the full URL, writes it into a contact custom field
-  ("Inventory Link").
-- The operator's SMS/email then uses that merge field to send the client the link.
+**Workflow 1 — Generate link** (trigger: *opportunity created*)
+- Webhook action → `POST /api/inventory/issue-link` with `{ contactId: {{contact.id}},
+  locationId: {{location.id}}, oppId: {{opportunity.id}} }` + shared-secret header.
+- Backend mints JWT `{ locationId, contactId, oppId, exp: 30d }`, builds
+  `https://inventory.systree.com.au/?k=<token>`, writes it to the contact's
+  `inventory_link` field (via `pushContactCustomField`), returns `200 { url }`.
+- **Trigger on opportunity (not contact) creation** so the token carries `oppId` — required
+  because the submitted inventory is written to BOTH the contact and the opportunity field.
 
-Interim/simpler: an admin endpoint or button that returns a copy-paste link for one
-contact.
+**Workflow 2 — Send link** (trigger: *opportunity stage moved*)
+- Condition gate: `inventory_link` is not empty (guards the rare case where a stage is
+  moved within ~1s of opp creation, before the field is populated).
+- Send SMS/Email containing the `{{ contact.inventory_link }}` merge field.
+
+> The split removes the need for a `Wait` step: the field is populated at opp-creation and
+> the send happens later on a deliberate stage move.
+
+Interim/simpler fallback: an admin endpoint/button that returns a copy-paste link for one
+contact (no workflow needed).
+
+---
+
+## 7. Custom field provisioning + writeback (GHL mechanism)
+
+The existing `provisionCustomFields()` in `services/ghlOutbound.js` already does the correct
+**check-by-fieldKey, create-if-missing, idempotent** pattern — but every current field is
+`model: 'opportunity'`. Inventory needs a **contact** field too, and GHL custom fields are
+model-scoped, so three opportunity-only pieces need a contact-aware path:
+
+1. **Provisioning** — `provisionCustomFields` hardcodes `model: 'opportunity'` (GET + POST).
+   Generalize: add a `model` property per `REQUIRED_FIELDS` entry (default `'opportunity'`),
+   fetch existing fields per model, create with the correct model.
+2. **UUID cache** — `getFieldKeyMap()` (`webhooks/ghlHandler.js`) only fetches
+   `model: 'opportunity'`, so a contact field's UUID never lands in
+   `mh_pwa_location_custom_fields`. Extend it to also fetch `model: 'contact'`, AND have
+   `provisionCustomFields` upsert each created field's `id` immediately (don't depend on the
+   daily lazy sync).
+3. **Writer** — `pushCustomFieldUpdate()` writes `PUT /opportunities/:id`. Add a new
+   `pushContactCustomField(contactId, fieldKey, value, locationId)` that writes
+   `PUT /contacts/:id` with `customFields: [{ id, field_value }]` (verify contact payload
+   shape vs opportunity — may be `value` not `field_value`). Reuses `getGhlClient`,
+   `retryWithBackoff`, `logOutbound`, 401-retry.
+
+**Match by `fieldKey`, not display name** — GHL keys are stable; display names can be renamed
+in the GHL UI and break a name match. ("Check by name" → in practice check by fieldKey.)
+
+### Three provisioned fields
+
+| Field key | Model | Type | Written by | Holds |
+|-----------|-------|------|-----------|-------|
+| `inventory_link` | contact | TEXT | `/issue-link` | the wizard URL (SMS/email merge field reads this) |
+| `inventory_details` | contact | LARGE_TEXT | `/submit` | readable inventory summary |
+| `inventory_details` | opportunity | LARGE_TEXT | `/submit` | same summary, on the opportunity |
+
+> Both `inventory_details` writes happen on submit (contact + opportunity). Format is a
+> readable summary only (rooms → items × qty, notes, estimated m³ + suggested 4.5t trucks).
+> This write is NOT fire-and-forget — failures must surface.
+
+### Provision timing
+- **Install-time:** add the three fields to `provisionCustomFields` (runs on app install).
+- **Submit-time lazy ensure:** also ensure the fields exist on first `/submit`, covering
+  locations that installed before these fields existed.
 
 ---
 
@@ -113,8 +168,10 @@ contact.
 - `022_inventory_drafts` — `mh_pwa_inventory_drafts`:
   `location_id`, `contact_id`, `opp_id`, `items JSONB`, `notes`,
   `status` (draft | submitted), timestamps; unique on (`location_id`, `contact_id`).
-- Confirm/extend `mh_pwa_location_custom_fields` to cover "Moving Inventory"
-  (+ "Inventory Link") fields.
+- `023_custom_field_model` — add `model` column to `mh_pwa_location_custom_fields`
+  (default `'opportunity'`, backfill existing rows). Needed because a contact and an
+  opportunity field can share a key (`inventory_details`); the writer disambiguates by
+  model. Unique key stays `(location_id, field_id)`.
 
 ## Frontend changes (inventory-tool)
 
@@ -132,17 +189,18 @@ contact.
 |--------|------|------|---------|
 | POST | `/api/inventory/session` | token (`k`) | Validate, return branding + saved draft |
 | POST | `/api/inventory/draft` | token (`k`) | Debounced autosave of items/notes |
-| POST | `/api/inventory/submit` | token (`k`) | Finalize → write summary to GHL contact field |
-| POST | `/api/inventory/issue-link` | shared key | Mint token, write link to contact field |
+| POST | `/api/inventory/submit` | token (`k`) | Finalize → write summary to contact + opportunity fields |
+| POST | `/api/inventory/issue-link` | shared key | Mint token, write link to contact `inventory_link` field |
 
-## Open decisions (settle before building)
+## Resolved decisions
 
-1. **Link delivery:** GHL-workflow-webhook auto-minting (recommended) or a manual admin
-   "generate link" button for v1?
-2. **Token expiry:** 30 days (recommended) or shorter?
-3. **Custom field:** readable-summary only, or readable + raw-JSON field?
-4. **Draft autosave:** backend draft (recommended) or localStorage-only for v1?
-5. **`oppId`:** include in token / also update the opportunity, or contact-only?
+1. **Field model:** BOTH contact and opportunity (`inventory_details` on each).
+2. **Format:** readable LARGE_TEXT summary only (no raw-JSON field).
+3. **Field name/key:** "Moving Inventory" / `inventory_details`; link field `inventory_link`.
+4. **Provision timing:** install-time + submit-time lazy ensure.
+5. **Link delivery:** GHL two-workflow design (generate on opp-created, send on stage-move).
+6. **Token expiry:** 30 days.
+7. **Draft autosave:** backend draft (not localStorage-only).
 
 ## Security / guardrails
 
@@ -152,3 +210,50 @@ contact.
 - Rate-limit `session` / `draft` / `submit`.
 - GHL writeback failures must surface clearly (don't silently drop a submitted inventory);
   this is NOT fire-and-forget like push notifications — the data must land.
+
+---
+
+## Build task list
+
+### Phase 1 — Schema & custom fields (backend foundation)
+- [ ] 1.1 Migration `022_inventory_drafts` — create `mh_pwa_inventory_drafts`.
+- [ ] 1.2 Migration `023_custom_field_model` — add `model` column to
+      `mh_pwa_location_custom_fields` (default `'opportunity'`, backfill).
+- [ ] 1.3 Generalize `provisionCustomFields` to be model-aware; add the three inventory
+      fields (`inventory_link` contact, `inventory_details` contact + opportunity).
+- [ ] 1.4 Have `provisionCustomFields` upsert each created field's `id`/`model` into
+      `mh_pwa_location_custom_fields`.
+- [ ] 1.5 Extend `getFieldKeyMap` to also fetch `model: 'contact'`.
+
+### Phase 2 — GHL writers
+- [ ] 2.1 Add `pushContactCustomField(contactId, fieldKey, value, locationId)` (writes
+      `PUT /contacts/:id`); verify contact payload shape vs opportunity.
+- [ ] 2.2 Confirm `pushCustomFieldUpdate` (opportunity) works for `inventory_details`.
+
+### Phase 3 — Token & endpoints
+- [ ] 3.1 Token helper: mint/verify JWT `{ locationId, contactId, oppId, exp: 30d }`.
+- [ ] 3.2 `POST /api/inventory/issue-link` (shared-secret) → mint + write `inventory_link`.
+- [ ] 3.3 `POST /api/inventory/session` (token) → verify, return branding + saved draft.
+- [ ] 3.4 `POST /api/inventory/draft` (token) → upsert draft.
+- [ ] 3.5 `POST /api/inventory/submit` (token) → format summary, lazy-ensure fields, write
+      to contact + opportunity, mark draft submitted. NOT fire-and-forget.
+- [ ] 3.6 Shared-secret middleware (`INVENTORY_LINK_SECRET`) + rate-limit session/draft/submit.
+- [ ] 3.7 Add `inventory.systree.com.au` to backend CORS allowlist (multi-origin).
+
+### Phase 4 — Frontend wiring (inventory-tool)
+- [ ] 4.1 `WizardPage`: read `?k=` token, call `/session`, real `/invalid` routing.
+- [ ] 4.2 Store: hold `locationId`/`contactId`/token, branding object replacing `mockTenant`,
+      debounced autosave to `/draft`.
+- [ ] 4.3 `ReviewStep.handleSubmit`: real `POST /submit` (replace 1.5s fake), include the
+      computed m³ + truck estimate in the payload/summary.
+- [ ] 4.4 Hydrate saved draft on load.
+
+### Phase 5 — GHL workflows (config, in GHL UI)
+- [ ] 5.1 Workflow 1: opp-created → webhook → `/issue-link` (with secret header).
+- [ ] 5.2 Workflow 2: stage-move → condition `inventory_link` not empty → send SMS/Email.
+
+### Phase 6 — Verify end-to-end
+- [ ] 6.1 New contact+opp → link generated → field populated.
+- [ ] 6.2 Open link → session validates, branding loads, draft resumes.
+- [ ] 6.3 Submit → summary lands on contact + opportunity fields.
+- [ ] 6.4 Expired/invalid token → `/invalid`.
