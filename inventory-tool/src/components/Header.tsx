@@ -1,10 +1,10 @@
 import React from 'react'
 import { ProgressBar } from './ProgressBar'
 import { useInventoryStore } from '../store/inventoryStore'
-import { mockTenant } from '../data/categories'
 
 export const Header: React.FC = () => {
   const { step, prevStep } = useInventoryStore()
+  const tenant = useInventoryStore(s => s.tenant)
   const progress = Math.round(useInventoryStore(s => s.getStepProgress()) * 100)
 
   return (
@@ -20,7 +20,7 @@ export const Header: React.FC = () => {
           )}
           <div className="flex items-center gap-2 flex-1">
             <img src="/logo.png" alt="MoverHero" className="w-8 h-8 rounded-lg flex-shrink-0" />
-            <span className="font-outfit font-semibold text-warm-900 text-sm">{mockTenant.name}</span>
+            <span className="font-outfit font-semibold text-warm-900 text-sm">{tenant.name}</span>
           </div>
           <span className="text-warm-400 text-sm font-medium">{progress}%</span>
         </div>

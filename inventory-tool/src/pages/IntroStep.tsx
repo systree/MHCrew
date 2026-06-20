@@ -1,11 +1,11 @@
 import React from 'react'
 import { useInventoryStore } from '../store/inventoryStore'
 import { StepButton } from '../components/StepButton'
-import { mockTenant } from '../data/categories'
 import { categories } from '../data/categories'
 
 export const IntroStep: React.FC = () => {
   const nextStep = useInventoryStore(s => s.nextStep)
+  const tenant = useInventoryStore(s => s.tenant)
 
   return (
     <div className="px-5 pt-8 pb-10 max-w-lg mx-auto">
@@ -44,7 +44,7 @@ export const IntroStep: React.FC = () => {
         Get Started →
       </StepButton>
 
-      <p className="text-center text-warm-400 text-sm mt-4">from {mockTenant.name}</p>
+      <p className="text-center text-warm-400 text-sm mt-4">from {tenant.name}</p>
     </div>
   )
 }

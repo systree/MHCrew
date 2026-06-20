@@ -1,14 +1,14 @@
 import { create } from 'zustand'
-import { categories } from '../data/categories'
+import { categories, mockTenant } from '../data/categories'
 import { getItemVolume, PACKING_FACTOR } from '../data/dimensions'
+import type { TenantInfo } from '../types/inventory'
 
 interface InventoryState {
   step: number
   items: Record<string, number>  // itemName -> quantity
   notes: string
-  contactId: string
-  oppId: string
-  tenantSlug: string
+  token: string
+  tenant: TenantInfo             // branding; company name resolved from the backend session
   isValid: boolean
   isLoading: boolean
   setStep: (s: number) => void
@@ -16,7 +16,9 @@ interface InventoryState {
   prevStep: () => void
   setQuantity: (item: string, qty: number) => void
   setNotes: (n: string) => void
-  setContactInfo: (c: string, o: string, t: string) => void
+  setToken: (t: string) => void
+  setCompanyName: (name: string | null) => void
+  hydrateDraft: (items: Record<string, number>, notes: string) => void
   setValid: (v: boolean) => void
   setLoading: (v: boolean) => void
   getTotalItems: () => number
@@ -30,9 +32,8 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
   step: 0,
   items: {},
   notes: '',
-  contactId: '',
-  oppId: '',
-  tenantSlug: '',
+  token: '',
+  tenant: mockTenant,
   isValid: false,
   isLoading: true,
   setStep: (step) => set({ step }),
@@ -40,7 +41,9 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
   prevStep: () => set(s => ({ step: Math.max(s.step - 1, 0) })),
   setQuantity: (item, qty) => set(s => ({ items: { ...s.items, [item]: Math.max(0, qty) } })),
   setNotes: (notes) => set({ notes }),
-  setContactInfo: (contactId, oppId, tenantSlug) => set({ contactId, oppId, tenantSlug }),
+  setToken: (token) => set({ token }),
+  setCompanyName: (name) => set(s => ({ tenant: { ...s.tenant, name: name || s.tenant.name } })),
+  hydrateDraft: (items, notes) => set({ items: items ?? {}, notes: notes ?? '' }),
   setValid: (isValid) => set({ isValid }),
   setLoading: (isLoading) => set({ isLoading }),
   getTotalItems: () => Object.values(get().items).reduce((a, b) => a + b, 0),

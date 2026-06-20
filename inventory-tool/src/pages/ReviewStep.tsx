@@ -4,11 +4,13 @@ import { useInventoryStore } from '../store/inventoryStore'
 import { StepButton } from '../components/StepButton'
 import { categories } from '../data/categories'
 import { getSuggestedTrucks } from '../data/dimensions'
+import { inventoryApi } from '../services/api'
 
 export const ReviewStep: React.FC = () => {
   const navigate = useNavigate()
   const { items, notes, setNotes, setStep, getTotalItems, getTotalVolume } = useInventoryStore()
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const totalVolume = getTotalVolume()
   const trucks = getSuggestedTrucks(totalVolume)
@@ -17,11 +19,32 @@ export const ReviewStep: React.FC = () => {
     cat.items.some(name => (items[name] || 0) > 0)
   )
 
+  // Operator-facing summary written to the GHL custom field, grouped by room.
+  const buildSummary = (): string => {
+    const lines: string[] = ['Moving Inventory', '']
+    for (const cat of activeCategories) {
+      const catItems = cat.items.filter(name => (items[name] || 0) > 0)
+      if (!catItems.length) continue
+      lines.push(`${cat.emoji} ${cat.name}`)
+      for (const name of catItems) lines.push(`  • ${name} × ${items[name]}`)
+      lines.push('')
+    }
+    lines.push(`Estimated volume: ≈ ${totalVolume.toFixed(1)} m³ (~${trucks} × 4.5t truck${trucks !== 1 ? 's' : ''})`)
+    if (notes && notes.trim()) lines.push('', `Notes: ${notes.trim()}`)
+    return lines.join('\n')
+  }
+
   const handleSubmit = async () => {
     setLoading(true)
-    await new Promise(r => setTimeout(r, 1500))
-    setLoading(false)
-    navigate('/submitted')
+    setError(null)
+    try {
+      const token = useInventoryStore.getState().token
+      await inventoryApi.submit(token, items, notes, buildSummary())
+      navigate('/submitted')
+    } catch {
+      setError('Something went wrong submitting your inventory. Please try again.')
+      setLoading(false)
+    }
   }
 
   // index of category step (step 0 = intro, step 1+ = categories)
@@ -92,6 +115,10 @@ export const ReviewStep: React.FC = () => {
           className="w-full bg-warm-100 border border-warm-200 rounded-2xl px-4 py-3 text-warm-800 placeholder-warm-400 focus:border-brand-400 focus:outline-none text-sm font-nunito resize-none"
         />
       </div>
+
+      {error && (
+        <p className="text-red-400 text-sm text-center mb-3">{error}</p>
+      )}
 
       <StepButton onClick={handleSubmit} fullWidth loading={loading}>
         {loading ? 'Submitting...' : 'Submit Inventory ✓'}
