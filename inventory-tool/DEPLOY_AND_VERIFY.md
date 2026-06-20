@@ -88,17 +88,16 @@ Custom Fields that these exist:
    - Method: `POST`
    - URL: `https://mhcrewbackend.systree.com.au/api/inventory/issue-link`
    - Header: `x-inventory-secret: <INVENTORY_LINK_SECRET>`
-   - Header: `Content-Type: application/json`
-   - Body (JSON):
-     ```json
-     {
-       "contactId": "{{contact.id}}",
-       "locationId": "{{location.id}}",
-       "oppId": "{{opportunity.id}}"
-     }
-     ```
-   - The backend mints the token, writes the URL to the contact's `inventory_link`
-     field, and returns `{ "url": "..." }`.
+   - **Custom Data** (GHL nests these under `customData` in the POST body — this is
+     how GHL sends them, and what the backend reads):
+     | Key | Value |
+     |-----|-------|
+     | `contactId` | `{{contact.id}}` |
+     | `locationId` | `{{location.id}}` |
+     | `oppId` | `{{opportunity.id}}` |
+   - The backend reads `customData.{contactId,locationId,oppId}`, mints the token,
+     writes the URL to the contact's `inventory_link` field, and returns
+     `{ "url": "..." }`.
 
 > If your GHL plan's webhook action can map the JSON response into a custom value,
 > you can skip relying on the field write — but the field write is the source of

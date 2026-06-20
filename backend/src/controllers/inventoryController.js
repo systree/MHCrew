@@ -43,7 +43,10 @@ async function writeContactFieldEnsuring(contactId, fieldKey, value, locationId)
 // Body: { contactId, locationId, oppId? }
 // ---------------------------------------------------------------------------
 async function issueLink(req, res) {
-  const { contactId, locationId, oppId } = req.body || {};
+  // GHL workflow webhooks nest the mapped fields under `customData`; accept that
+  // shape and also a flat body (customData wins if both are present).
+  const src = { ...(req.body || {}), ...(req.body?.customData || {}) };
+  const { contactId, locationId, oppId } = src;
 
   if (!contactId || !locationId) {
     return res.status(400).json({ error: 'contactId and locationId are required' });
