@@ -5,6 +5,7 @@ const photosRouter        = require('./photos');
 const locationsRouter     = require('./locations');
 const adminRouter         = require('./admin');
 const notificationsRouter = require('./notifications');
+const inventoryRouter     = require('./inventory');
 
 const router = Router();
 
@@ -27,5 +28,8 @@ router.use('/admin', adminRouter);
 
 // Push notifications — GET /notifications/vapid-key, POST/DELETE /notifications/subscribe
 router.use('/notifications', notificationsRouter);
+
+// Inventory tool — POST /inventory/issue-link (and session/draft/submit)
+router.use('/inventory', inventoryRouter);
 
 module.exports = router;
