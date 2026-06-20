@@ -334,14 +334,16 @@ button:disabled {
    Offline / Sync Banners
    ============================================================ */
 
-/* Slide-down entrance for both offline and sync banners */
+/* Slide-down entrance for both offline and sync banners.
+   Keeps translateX(-50%) in every frame so the animation (with fill-mode
+   forwards) doesn't override the horizontal centering of the fixed banners. */
 @keyframes bannerSlideDown {
   from {
-    transform: translateY(-100%);
+    transform: translate(-50%, -100%);
     opacity: 0;
   }
   to {
-    transform: translateY(0);
+    transform: translate(-50%, 0);
     opacity: 1;
   }
 }
