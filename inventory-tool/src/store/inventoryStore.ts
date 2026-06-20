@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { categories } from '../data/categories'
+import { getItemVolume, PACKING_FACTOR } from '../data/dimensions'
 
 interface InventoryState {
   step: number
@@ -19,6 +20,7 @@ interface InventoryState {
   setValid: (v: boolean) => void
   setLoading: (v: boolean) => void
   getTotalItems: () => number
+  getTotalVolume: () => number  // total cubic metres (m³), incl. packing factor
   getStepProgress: () => number
 }
 
@@ -42,5 +44,10 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
   setValid: (isValid) => set({ isValid }),
   setLoading: (isLoading) => set({ isLoading }),
   getTotalItems: () => Object.values(get().items).reduce((a, b) => a + b, 0),
+  getTotalVolume: () => {
+    const raw = Object.entries(get().items)
+      .reduce((sum, [name, qty]) => sum + getItemVolume(name) * qty, 0)
+    return raw * PACKING_FACTOR
+  },
   getStepProgress: () => get().step / (TOTAL_STEPS - 1),
 }))

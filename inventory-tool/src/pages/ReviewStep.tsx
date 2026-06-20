@@ -3,11 +3,15 @@ import { useNavigate } from 'react-router-dom'
 import { useInventoryStore } from '../store/inventoryStore'
 import { StepButton } from '../components/StepButton'
 import { categories } from '../data/categories'
+import { getSuggestedTrucks } from '../data/dimensions'
 
 export const ReviewStep: React.FC = () => {
   const navigate = useNavigate()
-  const { items, notes, setNotes, setStep, getTotalItems } = useInventoryStore()
+  const { items, notes, setNotes, setStep, getTotalItems, getTotalVolume } = useInventoryStore()
   const [loading, setLoading] = useState(false)
+
+  const totalVolume = getTotalVolume()
+  const trucks = getSuggestedTrucks(totalVolume)
 
   const activeCategories = categories.filter(cat =>
     cat.items.some(name => (items[name] || 0) > 0)
@@ -29,6 +33,22 @@ export const ReviewStep: React.FC = () => {
         <h2 className="text-2xl font-bold text-warm-900">Review your items</h2>
         <p className="text-warm-500 text-sm mt-1">{getTotalItems()} items across {activeCategories.length} room{activeCategories.length !== 1 ? 's' : ''}</p>
       </div>
+
+      {totalVolume > 0 && (
+        <div className="bg-brand-50 rounded-2xl border border-brand-200 p-4 mb-6 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-warm-500 text-xs font-medium uppercase tracking-wide">Estimated volume</p>
+            <p className="text-brand-700 text-2xl font-bold font-outfit tabular-nums">≈ {totalVolume.toFixed(1)} m³</p>
+          </div>
+          <div className="text-right">
+            <p className="text-warm-500 text-xs font-medium uppercase tracking-wide">Suggested</p>
+            <p className="text-warm-900 text-lg font-bold font-outfit">{trucks} × 4.5t truck{trucks !== 1 ? 's' : ''}</p>
+          </div>
+        </div>
+      )}
+      {totalVolume > 0 && (
+        <p className="text-warm-400 text-xs -mt-4 mb-6 px-1">Rough estimate to help plan your move — we'll confirm the details with you.</p>
+      )}
 
       {activeCategories.length === 0 ? (
         <div className="bg-warm-100 rounded-2xl p-6 text-center mb-6">
