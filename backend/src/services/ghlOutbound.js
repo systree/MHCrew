@@ -304,11 +304,11 @@ const REQUIRED_FIELDS = [
   { name: 'Crew Notes',       fieldKey: 'crew_notes',      dataType: 'LARGE_TEXT', model: 'opportunity' },
   { name: 'Job Status',       fieldKey: 'job_status',      dataType: 'TEXT',       model: 'opportunity' },
   {
-    name:            'Job Type',
-    fieldKey:        'job_type',
-    dataType:        'DROPDOWN',
-    model:           'opportunity',
-    pickListOptions: ['Door to Door', 'Depot to Depot', 'Quote'],
+    name:     'Job Type',
+    fieldKey: 'job_type',
+    dataType: 'SINGLE_OPTIONS', // GHL's single-select type; DROPDOWN is not valid
+    model:    'opportunity',
+    options:  ['Door to Door', 'Depot to Depot', 'Quote'],
   },
   // Inventory-tool fields. The link lives on the contact (SMS/email merge field
   // reads it); the submitted inventory summary is written to both the contact
@@ -370,7 +370,7 @@ async function provisionCustomFields(locationId) {
             dataType:  field.dataType,
             model,
             position:  0,
-            ...(field.pickListOptions ? { picklistOptions: field.pickListOptions } : {}),
+            ...(field.options ? { options: field.options } : {}),
           });
           const created = createdData?.customField ?? createdData;
           result.created.push(fullKey);
