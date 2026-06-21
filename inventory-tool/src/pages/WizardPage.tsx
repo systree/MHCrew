@@ -23,7 +23,7 @@ export const WizardPage: React.FC = () => {
     inventoryApi.session(k)
       .then((res) => {
         setCompanyName(res.tenant?.companyName ?? null)
-        if (res.draft) hydrateDraft(res.draft.items, res.draft.notes)
+        if (res.draft) hydrateDraft(res.draft.items, res.draft.notes, res.draft.step)
         setValid(true)
         setLoading(false)
       })
@@ -39,10 +39,10 @@ export const WizardPage: React.FC = () => {
     const token = useInventoryStore.getState().token
     if (!token) return
     const t = setTimeout(() => {
-      inventoryApi.saveDraft(token, items, notes).catch(() => { /* autosave is best-effort */ })
+      inventoryApi.saveDraft(token, items, notes, step).catch(() => { /* autosave is best-effort */ })
     }, 1000)
     return () => clearTimeout(t)
-  }, [items, notes, isLoading])
+  }, [items, notes, step, isLoading])
 
   const renderStep = () => {
     if (step === 0) return <IntroStep />

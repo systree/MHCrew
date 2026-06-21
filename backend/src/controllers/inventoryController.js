@@ -79,7 +79,7 @@ async function getSession(req, res) {
 
   const { data: draft } = await supabase
     .from('mh_pwa_inventory_drafts')
-    .select('items, notes, status')
+    .select('items, notes, status, step')
     .eq('location_id', locationId)
     .eq('contact_id', contactId)
     .maybeSingle();
@@ -87,7 +87,7 @@ async function getSession(req, res) {
   return res.status(200).json({
     tenant: { companyName: tenant?.company_name ?? null },
     draft: draft
-      ? { items: draft.items ?? {}, notes: draft.notes ?? '', status: draft.status }
+      ? { items: draft.items ?? {}, notes: draft.notes ?? '', status: draft.status, step: draft.step ?? 0 }
       : null,
   });
 }
@@ -101,6 +101,7 @@ async function saveDraft(req, res) {
   const { locationId, contactId, oppId } = req.inventory;
   const items = req.body?.items && typeof req.body.items === 'object' ? req.body.items : {};
   const notes = typeof req.body?.notes === 'string' ? req.body.notes : '';
+  const step = Number.isFinite(req.body?.step) ? Math.max(0, Math.floor(req.body.step)) : 0;
 
   const { error } = await supabase
     .from('mh_pwa_inventory_drafts')
@@ -111,6 +112,7 @@ async function saveDraft(req, res) {
         opp_id:      oppId,
         items,
         notes,
+        step,
         updated_at:  new Date().toISOString(),
       },
       { onConflict: 'location_id,contact_id' }

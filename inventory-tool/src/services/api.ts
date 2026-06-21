@@ -5,7 +5,7 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 
 export interface SessionResponse {
   tenant: { companyName: string | null }
-  draft: { items: Record<string, number>; notes: string; status: string } | null
+  draft: { items: Record<string, number>; notes: string; status: string; step: number } | null
 }
 
 interface ApiError extends Error {
@@ -32,8 +32,8 @@ async function post<T>(path: string, token: string, body?: object): Promise<T> {
 
 export const inventoryApi = {
   session: (token: string) => post<SessionResponse>('/session', token),
-  saveDraft: (token: string, items: Record<string, number>, notes: string) =>
-    post<{ ok: boolean }>('/draft', token, { items, notes }),
+  saveDraft: (token: string, items: Record<string, number>, notes: string, step: number) =>
+    post<{ ok: boolean }>('/draft', token, { items, notes, step }),
   submit: (token: string, items: Record<string, number>, notes: string, summary: string) =>
     post<{ ok: boolean }>('/submit', token, { items, notes, summary }),
 }

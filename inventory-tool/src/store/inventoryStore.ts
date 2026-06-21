@@ -18,7 +18,7 @@ interface InventoryState {
   setNotes: (n: string) => void
   setToken: (t: string) => void
   setCompanyName: (name: string | null) => void
-  hydrateDraft: (items: Record<string, number>, notes: string) => void
+  hydrateDraft: (items: Record<string, number>, notes: string, step: number) => void
   setValid: (v: boolean) => void
   setLoading: (v: boolean) => void
   getTotalItems: () => number
@@ -43,7 +43,7 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
   setNotes: (notes) => set({ notes }),
   setToken: (token) => set({ token }),
   setCompanyName: (name) => set(s => ({ tenant: { ...s.tenant, name: name || s.tenant.name } })),
-  hydrateDraft: (items, notes) => set({ items: items ?? {}, notes: notes ?? '' }),
+  hydrateDraft: (items, notes, step) => set({ items: items ?? {}, notes: notes ?? '', step: step ?? 0 }),
   setValid: (isValid) => set({ isValid }),
   setLoading: (isLoading) => set({ isLoading }),
   getTotalItems: () => Object.values(get().items).reduce((a, b) => a + b, 0),
