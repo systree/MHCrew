@@ -12,6 +12,8 @@ export default function AdminBillingRulesPage() {
   const [billingRulesEnabled,   setBillingRulesEnabled]   = useState(false);
   const [calloutMinutes,        setCalloutMinutes]        = useState(30);
   const [partialPaymentEnabled, setPartialPaymentEnabled] = useState(false);
+  const [minimumChargeEnabled,  setMinimumChargeEnabled]  = useState(false);
+  const [minimumChargeAmount,   setMinimumChargeAmount]   = useState(0);
 
   useEffect(() => {
     getBillingRules()
@@ -19,6 +21,8 @@ export default function AdminBillingRulesPage() {
         setBillingRulesEnabled(data.billingRulesEnabled   ?? false);
         setCalloutMinutes(data.calloutMinutes             ?? 30);
         setPartialPaymentEnabled(data.partialPaymentEnabled ?? false);
+        setMinimumChargeEnabled(data.minimumChargeEnabled ?? false);
+        setMinimumChargeAmount(data.minimumChargeAmount   ?? 0);
       })
       .catch(() => setError('Failed to load billing rules.'))
       .finally(() => setLoading(false));
@@ -33,6 +37,8 @@ export default function AdminBillingRulesPage() {
         billingRulesEnabled,
         calloutMinutes:   Number(calloutMinutes),
         partialPaymentEnabled,
+        minimumChargeEnabled,
+        minimumChargeAmount: Number(minimumChargeAmount),
       });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
@@ -117,6 +123,39 @@ export default function AdminBillingRulesPage() {
                 min="0"
                 step="5"
                 disabled={!billingRulesEnabled || saving}
+                style={styles.input}
+              />
+            </div>
+
+            {/* Minimum charge */}
+            <div style={styles.card}>
+              <div style={styles.toggleRow}>
+                <div>
+                  <p style={styles.toggleLabel}>Minimum Charge</p>
+                  <p style={styles.toggleDesc}>
+                    When enabled, the invoice helper floors the Moving Service line to the
+                    amount below (e.g. a 3-hour minimum). Applies to door-to-door and
+                    depot-to-depot jobs.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={minimumChargeEnabled}
+                  onClick={() => setMinimumChargeEnabled((v) => !v)}
+                  style={{ ...styles.toggle, ...(minimumChargeEnabled ? styles.toggleOn : styles.toggleOff) }}
+                >
+                  <span style={{ ...styles.toggleKnob, transform: minimumChargeEnabled ? 'translateX(20px)' : 'translateX(2px)' }} />
+                </button>
+              </div>
+              <label style={{ ...styles.fieldLabel, opacity: minimumChargeEnabled ? 1 : 0.5 }}>Minimum amount ($)</label>
+              <input
+                type="number"
+                value={minimumChargeAmount}
+                onChange={(e) => setMinimumChargeAmount(e.target.value)}
+                min="0"
+                step="10"
+                disabled={!minimumChargeEnabled || saving}
                 style={styles.input}
               />
             </div>

@@ -26,6 +26,7 @@ export default function CreateInvoicePage() {
   const [title,   setTitle]   = useState('');
   const [items,   setItems]   = useState([{ name: '', qty: '1', unitPrice: '' }]);
   const [dueDate, setDueDate] = useState('');
+  const [splitPayment, setSplitPayment] = useState(false);
   const [saving,  setSaving]  = useState(false);
   const [error,   setError]   = useState(null);
   const [tax,     setTax]     = useState(null); // { taxEnabled, taxName, taxRate }
@@ -111,6 +112,13 @@ export default function CreateInvoicePage() {
   const billingEnabled = billingRules?.billingRulesEnabled && jobType;
   const calloutMins    = billingRules?.calloutMinutes ?? 30;
   const calloutHours   = calloutMins / 60;
+  const minChargeOn    = billingRules?.minimumChargeEnabled ?? false;
+  const minChargeAmt   = parseFloat(billingRules?.minimumChargeAmount) || 0;
+
+  // Floor the Moving Service line to the configured minimum when enabled.
+  const applyMinimum = useCallback((amount) => {
+    return minChargeOn && minChargeAmt > 0 ? Math.max(amount, minChargeAmt) : amount;
+  }, [minChargeOn, minChargeAmt]);
 
   // Sync line items from billing-rules helper inputs when in door_to_door / depot_to_depot mode
   const billingItems = useCallback(() => {
@@ -119,20 +127,23 @@ export default function CreateInvoicePage() {
     if (!hrs || !rate) return null;
 
     if (jobType === 'door_to_door') {
-      const workTotal    = hrs * rate;
+      const workTotal    = applyMinimum(hrs * rate);
       const calloutTotal = calloutHours * rate;
+      const atMin        = workTotal > hrs * rate;
       return [
-        { name: `Moving Service (${hrs}h)`,                  qty: '1', unitPrice: String(workTotal.toFixed(2)) },
+        { name: atMin ? 'Moving Service (minimum charge)' : `Moving Service (${hrs}h)`, qty: '1', unitPrice: String(workTotal.toFixed(2)) },
         { name: `Callout Charge (${calloutMins} min)`,        qty: '1', unitPrice: String(calloutTotal.toFixed(2)) },
       ];
     }
     if (jobType === 'depot_to_depot') {
+      const total = applyMinimum(hrs * rate);
+      const atMin = total > hrs * rate;
       return [
-        { name: `Moving Service (${hrs}h)`, qty: '1', unitPrice: String((hrs * rate).toFixed(2)) },
+        { name: atMin ? 'Moving Service (minimum charge)' : `Moving Service (${hrs}h)`, qty: '1', unitPrice: String(total.toFixed(2)) },
       ];
     }
     return null;
-  }, [jobType, workHours, hourlyRate, calloutHours, calloutMins]);
+  }, [jobType, workHours, hourlyRate, calloutHours, calloutMins, applyMinimum]);
 
   // Apply billing helper items when inputs change
   useEffect(() => {
@@ -185,13 +196,14 @@ export default function CreateInvoicePage() {
           unitPrice: parseFloat(it.unitPrice),
         })),
         ...(dueDate ? { dueDate } : {}),
+        ...(splitPayment ? { splitPayment: true } : {}),
       });
       navigate(`/jobs/${id}`, { state: { invoiceSent: true } });
     } catch (err) {
       setError(err.response?.data?.error ?? 'Failed to send invoice. Please try again.');
       setSaving(false);
     }
-  }, [id, title, items, dueDate, navigate]);
+  }, [id, title, items, dueDate, splitPayment, navigate]);
 
   if (loading) {
     return (
@@ -446,6 +458,25 @@ export default function CreateInvoicePage() {
               disabled={saving}
             />
           </div>
+
+          {/* Split payment (1/3-1/3-1/3) — only when tenant has partial payments enabled */}
+          {billingRules?.partialPaymentEnabled && (
+            <div className="card" style={styles.section}>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: saving ? 'default' : 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={splitPayment}
+                  onChange={(e) => setSplitPayment(e.target.checked)}
+                  disabled={saving}
+                  style={{ marginTop: 2, width: 18, height: 18, flexShrink: 0 }}
+                />
+                <span>
+                  <span style={{ ...styles.label, display: 'block' }}>Split into 3 payments</span>
+                  <span style={styles.optional}>1/3 deposit (due today), 1/3 (+1 day), 1/3 (+21 days). The client pays each instalment via the invoice link.</span>
+                </span>
+              </label>
+            </div>
+          )}
 
           {/* Error */}
           {error && <div style={styles.errorBanner}>{error}</div>}

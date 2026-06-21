@@ -912,7 +912,7 @@ async function getBillingRules(req, res) {
   try {
     const { data: tenant, error } = await supabase
       .from('mh_pwa_tenants')
-      .select('billing_rules_enabled, billing_callout_minutes, invoice_partial_payment_enabled')
+      .select('billing_rules_enabled, billing_callout_minutes, invoice_partial_payment_enabled, billing_minimum_charge_enabled, billing_minimum_charge_amount')
       .eq('location_id', locationId)
       .maybeSingle();
 
@@ -925,6 +925,8 @@ async function getBillingRules(req, res) {
       billingRulesEnabled:      tenant?.billing_rules_enabled            ?? false,
       calloutMinutes:           tenant?.billing_callout_minutes          ?? 30,
       partialPaymentEnabled:    tenant?.invoice_partial_payment_enabled  ?? false,
+      minimumChargeEnabled:     tenant?.billing_minimum_charge_enabled   ?? false,
+      minimumChargeAmount:      Number(tenant?.billing_minimum_charge_amount ?? 0),
     });
   } catch (err) {
     logger.error(`getBillingRules error location=${locationId}: ${err.message}`);
@@ -938,12 +940,14 @@ async function getBillingRules(req, res) {
 // ---------------------------------------------------------------------------
 async function updateBillingRules(req, res) {
   const locationId = req.user.locationId;
-  const { billingRulesEnabled, calloutMinutes, partialPaymentEnabled } = req.body;
+  const { billingRulesEnabled, calloutMinutes, partialPaymentEnabled, minimumChargeEnabled, minimumChargeAmount } = req.body;
 
   const updates = { updated_at: new Date().toISOString() };
   if (billingRulesEnabled   !== undefined) updates.billing_rules_enabled           = Boolean(billingRulesEnabled);
   if (calloutMinutes        !== undefined) updates.billing_callout_minutes          = Number(calloutMinutes);
   if (partialPaymentEnabled !== undefined) updates.invoice_partial_payment_enabled  = Boolean(partialPaymentEnabled);
+  if (minimumChargeEnabled  !== undefined) updates.billing_minimum_charge_enabled   = Boolean(minimumChargeEnabled);
+  if (minimumChargeAmount   !== undefined) updates.billing_minimum_charge_amount    = Number(minimumChargeAmount);
 
   if (Object.keys(updates).length === 1) {
     return res.status(422).json({ error: 'No valid fields provided' });

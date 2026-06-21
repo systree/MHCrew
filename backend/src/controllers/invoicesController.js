@@ -115,7 +115,7 @@ async function createJobInvoice(req, res) {
   const userId     = req.user.userId;
   const locationId = req.user.locationId;
   const { jobId }  = req.params;
-  const { title, items, dueDate } = req.body;
+  const { title, items, dueDate, splitPayment } = req.body;
 
   // Validate body
   if (!title || typeof title !== 'string' || !title.trim()) {
@@ -175,6 +175,7 @@ async function createJobInvoice(req, res) {
           'invoice_tax_name',
           'invoice_tax_rate',
           'invoice_tax_calculation',
+          'invoice_partial_payment_enabled',
         ].join(', '))
         .eq('location_id', locationId)
         .maybeSingle(),
@@ -238,6 +239,26 @@ async function createJobInvoice(req, res) {
     const issueDate = new Date().toISOString().slice(0, 10);
     const prefix    = tenant.invoice_number_prefix ?? 'INV-';
 
+    // 1/3–1/3–1/3 payment schedule (deposit today, +1 day, +21 days) when the crew
+    // opted in AND the tenant has partial payments enabled. GHL computes the per-
+    // installment dollar amounts from the percentages.
+    let paymentSchedule;
+    if (splitPayment && tenant.invoice_partial_payment_enabled) {
+      const scheduleDate = (offsetDays) => {
+        const d = new Date();
+        d.setDate(d.getDate() + offsetDays);
+        return d.toISOString().slice(0, 10);
+      };
+      paymentSchedule = {
+        type: 'percentage',
+        schedules: [
+          { dueDate: scheduleDate(0),  value: 33 },
+          { dueDate: scheduleDate(1),  value: 33 },
+          { dueDate: scheduleDate(21), value: 34 },
+        ],
+      };
+    }
+
     const payload = {
       altId:   locationId,
       altType: 'location',
@@ -252,6 +273,7 @@ async function createJobInvoice(req, res) {
       liveMode:               true,
       automaticTaxesEnabled:  false,
       paymentMethods:         { stripe: { enableBankDebitOnly: false } },
+      ...(paymentSchedule ? { paymentSchedule } : {}),
       items: items.map((it) => ({
         name:     it.name.trim(),
         qty:      Number(it.quantity),
