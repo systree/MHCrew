@@ -213,53 +213,6 @@ async function pushCustomFieldUpdate(ghlJobId, fieldKey, value, locationId) {
 }
 
 // ---------------------------------------------------------------------------
-// pushContactCustomField
-// Update a single custom field value on a GHL contact.
-// `fieldKey` is the prefixed key as stored by GHL/the cache
-// (e.g. "contact.inventory_details"), same convention as pushCustomFieldUpdate.
-// Unlike most outbound calls this is NOT fire-and-forget: it THROWS on failure
-// so callers (issue-link, submit) can guarantee the data actually landed.
-// ---------------------------------------------------------------------------
-async function pushContactCustomField(ghlContactId, fieldKey, value, locationId) {
-  const eventType = 'contact.custom_field_update';
-  const payload   = { ghlContactId, fieldKey, value, locationId };
-
-  logger.info(`GHL outbound: ${eventType} contact=${ghlContactId} field=${fieldKey} location=${locationId}`);
-
-  // Resolve the field UUID from the cached contact-model definitions.
-  const { data: fieldRow } = await supabase
-    .from('mh_pwa_location_custom_fields')
-    .select('field_id')
-    .eq('location_id', locationId)
-    .eq('field_key', fieldKey)
-    .maybeSingle();
-
-  if (!fieldRow) {
-    const msg = `No contact field UUID for key=${fieldKey} location=${locationId}`;
-    logger.warn(`pushContactCustomField: ${msg} — skipping`);
-    await logOutbound(eventType, payload, 'failed', locationId, msg);
-    throw new Error(msg);
-  }
-
-  try {
-    const client = await getGhlClient(locationId);
-    // GHL contact update mirrors the opportunity shape: customFields [{ id, field_value }]
-    await retryWithBackoff(() =>
-      client.put(`/contacts/${ghlContactId}`, {
-        customFields: [{ id: fieldRow.field_id, field_value: value }],
-      })
-    );
-
-    await logOutbound(eventType, payload, 'success', locationId);
-    logger.info(`GHL outbound success: ${eventType} contact=${ghlContactId} field=${fieldKey}`);
-  } catch (err) {
-    logger.error(`GHL outbound failed: ${eventType} contact=${ghlContactId} field=${fieldKey}: ${err.message}`);
-    await logOutbound(eventType, payload, 'failed', locationId, err.message);
-    throw err;
-  }
-}
-
-// ---------------------------------------------------------------------------
 // pushLocationUpdate
 // Send an en-route or arrived event to GHL as a note on the opportunity.
 // ---------------------------------------------------------------------------
@@ -310,12 +263,6 @@ const REQUIRED_FIELDS = [
     model:    'opportunity',
     options:  ['Door to Door', 'Depot to Depot', 'Quote'],
   },
-  // Inventory-tool fields. The link lives on the contact (SMS/email merge field
-  // reads it); the submitted inventory summary is written to both the contact
-  // and the opportunity.
-  { name: 'Inventory Link',   fieldKey: 'inventory_link',    dataType: 'TEXT',       model: 'contact'     },
-  { name: 'Moving Inventory', fieldKey: 'inventory_details', dataType: 'LARGE_TEXT', model: 'contact'     },
-  { name: 'Moving Inventory', fieldKey: 'inventory_details', dataType: 'LARGE_TEXT', model: 'opportunity' },
 ];
 
 async function provisionCustomFields(locationId) {
@@ -409,6 +356,5 @@ module.exports = {
   pushLocationUpdate,
   pushStageUpdate,
   pushCustomFieldUpdate,
-  pushContactCustomField,
   provisionCustomFields,
 };
