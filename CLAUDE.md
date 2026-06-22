@@ -8,7 +8,7 @@
 - `frontend/src/services/api.js` — crew-facing API (jobsApi, invoicesApi, timesheetApi)
 - `frontend/src/services/adminApi.js` — admin-only API calls
 - `frontend/src/pages/admin/` — all admin pages
-- `backend/supabase/migrations/` — sequential SQL files (next: 022_*)
+- `backend/supabase/migrations/` — sequential SQL files (next: 027_*)
 
 ## Key Conventions
 - DB table prefix: `mh_pwa_` (e.g. `mh_pwa_jobs`, `mh_pwa_tenants`)
