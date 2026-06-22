@@ -250,6 +250,10 @@ If your admin has enabled billing rules, the invoice screen will show a helper s
 - **Depot to Depot** — enter hours and hourly rate. No callout charge is added.
 - **Quote** — if there is an accepted estimate, you will see a shortcut to create the invoice from the estimate instead of filling it in manually.
 
+**Minimum charge:** if your admin has set a minimum charge, the Moving Service line is automatically raised to that amount whenever the calculated total (hours × rate) would fall below it. The line is labelled "Moving Service (minimum charge)" so it's clear the minimum was applied. The Door to Door callout is still added on top of the minimum.
+
+**Split into 3 payments (deposit / pickup / delivery):** if your admin has enabled Partial Payments, a "Split into 3 payments" checkbox appears on the Create Invoice screen. Tick it for large jobs (typically interstate) to put a 1/3–1/3–1/3 payment schedule on the invoice: the deposit is due today, the second third the next day, and the final third in 21 days. The customer receives one invoice link by SMS and email and pays each instalment from it; the system works out the exact amounts. Leave it unticked for normal single-payment invoices.
+
 **If an invoice is still in Draft (send failed):**
 
 Expand the invoice in the Invoices section on the job detail page. If it shows "Draft" status, tap "Send Invoice to Client" to send it manually.
@@ -423,7 +427,9 @@ Billing Rules add intelligent helpers to the invoice creation screen, based on t
 
 **Door-to-Door Callout (minutes)** — when billing rules are enabled and the job type is "Door to Door," a callout charge is automatically added to invoices. This setting controls how many minutes to charge. The default is 30 minutes. For example, at an hourly rate of $220, a 30-minute callout charge would add $110 to the invoice.
 
-**Partial Payments (Interstate)** — when enabled, a 1/3–1/3–1/3 payment schedule is added to new invoices for large jobs.
+**Minimum Charge** — a toggle plus an amount ($). When enabled, the invoice helper floors the Moving Service line to this amount: if the calculated total (hours × rate) is below the minimum, the line is set to the minimum instead. Applies to Door to Door and Depot to Depot jobs. For example, with a $660 minimum, a short job that would otherwise calculate to $440 is charged $660 (the Door to Door callout is still added on top). When the toggle is off, no minimum is applied.
+
+**Partial Payments (Interstate)** — the master switch for split payments. When enabled, a "Split into 3 payments" checkbox appears on the Create Invoice screen. Crew tick it per job to put a 1/3–1/3–1/3 schedule on the invoice (deposit due today, then +1 day, then +21 days); the customer pays each instalment from the single invoice link. When this toggle is off, the checkbox doesn't appear.
 
 Tap "Save" when done.
 
