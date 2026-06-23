@@ -32,7 +32,7 @@ function timeAgo(isoStr) {
 }
 
 function createMarkerIcon(name, status) {
-  const color = STATUS_COLORS[status] ?? '#e94560';
+  const color = STATUS_COLORS[status] ?? '#ff7a18';
   const label = initials(name);
   return L.divIcon({
     html: `<div style="
@@ -152,7 +152,7 @@ export default function CrewMapPage() {
         icon: createMarkerIcon(d.crewName, d.jobStatus),
       });
 
-      const statusColor  = STATUS_COLORS[d.jobStatus] ?? '#e94560';
+      const statusColor  = STATUS_COLORS[d.jobStatus] ?? '#ff7a18';
       const statusLabel  = STATUS_LABELS[d.jobStatus] ?? d.jobStatus;
       const ago          = d.timestamp ? timeAgo(d.timestamp) : '—';
       const accuracy     = d.accuracy  ? `±${Math.round(d.accuracy)}m` : '';

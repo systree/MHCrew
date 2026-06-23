@@ -47,7 +47,7 @@ const INV_STATUS_LABELS = {
 
 const INV_STATUS_STYLES = {
   draft: {
-    backgroundColor: "rgba(136,136,170,0.12)",
+    backgroundColor: "rgba(163,163,163,0.12)",
     color: "var(--color-text-muted)",
     border: "1px solid var(--color-border)",
   },
@@ -72,7 +72,7 @@ const INV_STATUS_STYLES = {
     border: "1px solid rgba(34,197,94,0.25)",
   },
   default: {
-    backgroundColor: "rgba(136,136,170,0.12)",
+    backgroundColor: "rgba(163,163,163,0.12)",
     color: "var(--color-text-muted)",
     border: "1px solid var(--color-border)",
   },
@@ -91,7 +91,7 @@ const EST_STATUS_LABELS = {
 
 const EST_STATUS_STYLES = {
   draft: {
-    backgroundColor: "rgba(136,136,170,0.12)",
+    backgroundColor: "rgba(163,163,163,0.12)",
     color: "var(--color-text-muted)",
     border: "1px solid var(--color-border)",
   },
@@ -111,7 +111,7 @@ const EST_STATUS_STYLES = {
     border: "1px solid rgba(239,68,68,0.3)",
   },
   expired: {
-    backgroundColor: "rgba(136,136,170,0.12)",
+    backgroundColor: "rgba(163,163,163,0.12)",
     color: "var(--color-text-muted)",
     border: "1px solid var(--color-border)",
   },
@@ -121,7 +121,7 @@ const EST_STATUS_STYLES = {
     border: "1px solid rgba(139,92,246,0.3)",
   },
   default: {
-    backgroundColor: "rgba(136,136,170,0.12)",
+    backgroundColor: "rgba(163,163,163,0.12)",
     color: "var(--color-text-muted)",
     border: "1px solid var(--color-border)",
   },
@@ -2111,7 +2111,7 @@ const styles = {
     gap: 6,
     padding: "8px 14px",
     backgroundColor: "var(--color-primary)",
-    color: "#fff",
+    color: "var(--color-on-primary)",
     borderRadius: "var(--radius-md)",
     fontSize: "var(--font-size-sm)",
     fontWeight: 600,

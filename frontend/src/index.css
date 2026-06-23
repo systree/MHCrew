@@ -11,16 +11,17 @@
 
 :root {
   /* Color palette */
-  --color-bg:           #0f0f1a;
-  --color-surface:      #1a1a2e;
-  --color-surface-2:    #16213e;
-  --color-surface-3:    #0f3460;
-  --color-border:       #2a2a45;
-  --color-primary:      #e94560;
-  --color-primary-dark: #c73652;
-  --color-text:         #f0f0f5;
-  --color-text-muted:   #8888aa;
-  --color-text-dim:     #55556a;
+  --color-bg:           #121212;
+  --color-surface:      #1e1e1e;
+  --color-surface-2:    #262626;
+  --color-surface-3:    #2e2e2e;
+  --color-border:       #363636;
+  --color-primary:      #ff7a18;
+  --color-primary-dark: #e06a10;
+  --color-on-primary:   #1a1a1a; /* text/icons on orange fills — set to #fff for brand white-on-orange */
+  --color-text:         #f5f5f5;
+  --color-text-muted:   #a3a3a3;
+  --color-text-dim:     #6b6b6b;
 
   /* Status colors */
   --status-assigned:    #6b7280;
@@ -176,7 +177,7 @@ button:disabled {
 
 .btn-primary {
   background-color: var(--color-primary);
-  color: #fff;
+  color: var(--color-on-primary);
   padding: 15px var(--spacing-lg);
   width: 100%;
   font-size: var(--font-size-md);

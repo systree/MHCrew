@@ -273,7 +273,7 @@ export default function ProfilePage() {
                       borderRadius: "var(--radius-md)",
                       border: subscribed
                         ? "1px solid rgba(239,68,68,0.3)"
-                        : "1px solid rgba(233,69,96,0.4)",
+                        : "1px solid rgba(255,122,24,0.4)",
                       background: subscribed
                         ? "rgba(239,68,68,0.1)"
                         : "var(--color-primary)",
@@ -538,11 +538,11 @@ const styles = {
     width: 80,
     height: 80,
     borderRadius: "50%",
-    background: "linear-gradient(135deg, #e94560, #c73652)",
+    background: "linear-gradient(135deg, #ff7a18, #e06a10)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    boxShadow: "0 4px 16px rgba(233,69,96,0.4)",
+    boxShadow: "0 4px 16px rgba(255,122,24,0.4)",
   },
   avatarInitials: {
     fontSize: 28,

@@ -16,7 +16,7 @@ const STATUS_LABELS = {
 };
 
 const STATUS_COLORS = {
-  assigned:    { bg: 'rgba(136,136,170,0.12)', color: 'var(--color-text-muted)', border: 'var(--color-border)' },
+  assigned:    { bg: 'rgba(163,163,163,0.12)', color: 'var(--color-text-muted)', border: 'var(--color-border)' },
   enroute:     { bg: 'rgba(59,130,246,0.12)',  color: '#60a5fa',                 border: 'rgba(59,130,246,0.3)' },
   arrived:     { bg: 'rgba(234,179,8,0.12)',   color: '#facc15',                 border: 'rgba(234,179,8,0.3)' },
   in_progress: { bg: 'rgba(249,115,22,0.12)',  color: '#fb923c',                 border: 'rgba(249,115,22,0.3)' },
@@ -168,13 +168,13 @@ const EST_STATUS_LABELS = {
 };
 
 const EST_STATUS_STYLES = {
-  draft:    { backgroundColor: 'rgba(136,136,170,0.12)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' },
+  draft:    { backgroundColor: 'rgba(163,163,163,0.12)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' },
   sent:     { backgroundColor: 'rgba(59,130,246,0.12)',  color: '#60a5fa',                 border: '1px solid rgba(59,130,246,0.3)' },
   accepted: { backgroundColor: 'rgba(34,197,94,0.12)',   color: '#4ade80',                 border: '1px solid rgba(34,197,94,0.25)' },
   declined: { backgroundColor: 'rgba(239,68,68,0.12)',   color: '#f87171',                 border: '1px solid rgba(239,68,68,0.3)' },
-  expired:  { backgroundColor: 'rgba(136,136,170,0.12)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' },
+  expired:  { backgroundColor: 'rgba(163,163,163,0.12)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' },
   invoiced: { backgroundColor: 'rgba(139,92,246,0.12)',  color: '#a78bfa',                 border: '1px solid rgba(139,92,246,0.3)' },
-  default:  { backgroundColor: 'rgba(136,136,170,0.12)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' },
+  default:  { backgroundColor: 'rgba(163,163,163,0.12)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' },
 };
 
 function JobCard({ job }) {
@@ -441,7 +441,7 @@ const styles = {
   filterBtnActive: {
     backgroundColor: 'var(--color-primary)',
     borderColor: 'var(--color-primary)',
-    color: '#fff',
+    color: 'var(--color-on-primary)',
   },
   filterCount: {
     display: 'inline-flex',

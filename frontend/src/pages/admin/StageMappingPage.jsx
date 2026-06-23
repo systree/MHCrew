@@ -293,7 +293,7 @@ const styles = {
     marginTop: 16,
     padding: '10px 20px',
     backgroundColor: 'var(--color-primary)',
-    color: '#fff',
+    color: 'var(--color-on-primary)',
     fontWeight: 700,
     fontSize: 'var(--font-size-sm)',
     borderRadius: 'var(--radius-md)',
@@ -317,7 +317,7 @@ const styles = {
     border: '1px solid rgba(34,197,94,0.25)',
   },
   countPillUnmapped: {
-    backgroundColor: 'rgba(136,136,170,0.12)',
+    backgroundColor: 'rgba(163,163,163,0.12)',
     color: 'var(--color-text-muted)',
     border: '1px solid var(--color-border)',
   },

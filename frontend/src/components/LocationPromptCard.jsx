@@ -162,18 +162,18 @@ export default function LocationPromptCard() {
 
 const cardStyle = {
   backgroundColor: 'var(--color-surface)',
-  border: '1px solid rgba(233,69,96,0.25)',
+  border: '1px solid rgba(255,122,24,0.25)',
   borderRadius: 'var(--radius-lg)',
   padding: 16,
-  boxShadow: '0 0 0 1px rgba(233,69,96,0.08), 0 4px 16px rgba(0,0,0,0.2)',
+  boxShadow: '0 0 0 1px rgba(255,122,24,0.08), 0 4px 16px rgba(0,0,0,0.2)',
 };
 
 const iconWrapStyle = {
   width: 40,
   height: 40,
   borderRadius: 'var(--radius-md)',
-  background: 'rgba(233,69,96,0.12)',
-  border: '1px solid rgba(233,69,96,0.2)',
+  background: 'rgba(255,122,24,0.12)',
+  border: '1px solid rgba(255,122,24,0.2)',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',

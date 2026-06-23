@@ -266,9 +266,9 @@ function RoleBadge({ role }) {
       fontWeight: 700,
       textTransform: 'uppercase',
       letterSpacing: '0.05em',
-      backgroundColor: isAdmin ? 'rgba(233,69,96,0.15)' : 'rgba(136,136,170,0.12)',
+      backgroundColor: isAdmin ? 'rgba(255,122,24,0.15)' : 'rgba(163,163,163,0.12)',
       color: isAdmin ? 'var(--color-primary)' : 'var(--color-text-muted)',
-      border: isAdmin ? '1px solid rgba(233,69,96,0.3)' : '1px solid var(--color-border)',
+      border: isAdmin ? '1px solid rgba(255,122,24,0.3)' : '1px solid var(--color-border)',
     }}>
       {role ?? 'crew'}
     </span>
@@ -360,7 +360,7 @@ const styles = {
   filterBtnActive: {
     backgroundColor: 'var(--color-primary)',
     borderColor: 'var(--color-primary)',
-    color: '#fff',
+    color: 'var(--color-on-primary)',
   },
   filterCount: {
     display: 'inline-flex',

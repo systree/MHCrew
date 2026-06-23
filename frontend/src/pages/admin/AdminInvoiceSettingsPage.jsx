@@ -323,7 +323,7 @@ const styles = {
     cursor: 'pointer',
     transition: 'background-color 0.15s, color 0.15s',
   },
-  segmentActive:   { backgroundColor: 'var(--color-primary)', color: '#fff' },
+  segmentActive:   { backgroundColor: 'var(--color-primary)', color: 'var(--color-on-primary)' },
   segmentInactive: { backgroundColor: 'var(--color-surface-2)', color: 'var(--color-text-muted)' },
   errorBanner: {
     padding: '10px 14px',

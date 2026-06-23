@@ -287,7 +287,7 @@ const styles = {
   },
   tabActive: {
     background: "var(--color-primary)",
-    color: "#fff",
+    color: "var(--color-on-primary)",
   },
   tabInactive: {
     background: "var(--color-surface-2)",

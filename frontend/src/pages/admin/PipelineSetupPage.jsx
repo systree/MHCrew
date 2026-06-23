@@ -251,7 +251,7 @@ const styles = {
   },
   pipelineRowSelected: {
     borderColor: 'var(--color-primary)',
-    backgroundColor: 'rgba(233,69,96,0.06)',
+    backgroundColor: 'rgba(255,122,24,0.06)',
   },
   radioDot: {
     width: 20,
