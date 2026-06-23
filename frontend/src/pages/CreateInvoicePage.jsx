@@ -447,9 +447,11 @@ export default function CreateInvoicePage() {
             </div>
           </div>
 
-          {/* Due date */}
+          {/* Due date (doubles as the first-payment date when split) */}
           <div className="card" style={styles.section}>
-            <label style={styles.label}>Due Date <span style={styles.optional}>(optional)</span></label>
+            <label style={styles.label}>
+              {splitPayment ? 'First payment date' : 'Due Date'} <span style={styles.optional}>(optional)</span>
+            </label>
             <input
               type="date"
               value={dueDate}
@@ -457,6 +459,11 @@ export default function CreateInvoicePage() {
               style={styles.input}
               disabled={saving}
             />
+            {splitPayment && (
+              <span style={{ ...styles.optional, display: 'block', marginTop: 6 }}>
+                Instalments fall on this day, +1 and +2 days; the invoice is due 3 days later. Defaults to today if left empty.
+              </span>
+            )}
           </div>
 
           {/* Split payment (1/3-1/3-1/3) — only when tenant has partial payments enabled */}
@@ -472,7 +479,7 @@ export default function CreateInvoicePage() {
                 />
                 <span>
                   <span style={{ ...styles.label, display: 'block' }}>Split into 3 payments</span>
-                  <span style={styles.optional}>1/3 deposit (due today), 1/3 (+1 day), 1/3 (+21 days). The client pays each instalment via the invoice link.</span>
+                  <span style={styles.optional}>1/3 on the first payment date, 1/3 the next day, 1/3 the day after. The client pays each instalment via the invoice link.</span>
                 </span>
               </label>
             </div>

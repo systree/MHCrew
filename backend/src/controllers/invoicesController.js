@@ -239,24 +239,32 @@ async function createJobInvoice(req, res) {
     const issueDate = new Date().toISOString().slice(0, 10);
     const prefix    = tenant.invoice_number_prefix ?? 'INV-';
 
-    // 1/3–1/3–1/3 payment schedule (deposit today, +1 day, +21 days) when the crew
-    // opted in AND the tenant has partial payments enabled. GHL computes the per-
-    // installment dollar amounts from the percentages.
+    // Base date `d` for the due date / payment schedule: the selected due date,
+    // or today — never back-dated (clamped so schedule dates aren't in the past).
+    const addDays = (isoDate, n) => {
+      const dt = new Date(`${isoDate}T00:00:00Z`);
+      dt.setUTCDate(dt.getUTCDate() + n);
+      return dt.toISOString().slice(0, 10);
+    };
+    const baseDate = (dueDate && dueDate > issueDate) ? dueDate : issueDate;
+
+    // 1/3–1/3–1/3 payment schedule (on `d`, d+1, d+2) when the crew opted in AND
+    // the tenant has partial payments enabled. GHL computes the per-instalment
+    // dollar amounts from the percentages, and requires every schedule date to
+    // be strictly before the invoice due date — so the invoice falls due on d+3.
+    // Without a split the invoice is simply due on `d`.
     let paymentSchedule;
+    let effectiveDueDate = baseDate;
     if (splitPayment && tenant.invoice_partial_payment_enabled) {
-      const scheduleDate = (offsetDays) => {
-        const d = new Date();
-        d.setDate(d.getDate() + offsetDays);
-        return d.toISOString().slice(0, 10);
-      };
       paymentSchedule = {
         type: 'percentage',
         schedules: [
-          { dueDate: scheduleDate(0),  value: 33 },
-          { dueDate: scheduleDate(1),  value: 33 },
-          { dueDate: scheduleDate(21), value: 34 },
+          { dueDate: baseDate,             value: 33 },
+          { dueDate: addDays(baseDate, 1), value: 33 },
+          { dueDate: addDays(baseDate, 2), value: 34 },
         ],
       };
+      effectiveDueDate = addDays(baseDate, 3);
     }
 
     const payload = {
@@ -266,7 +274,7 @@ async function createJobInvoice(req, res) {
       title:   title.trim(),
       contactDetails,
       issueDate,
-      ...(dueDate         ? { dueDate }                                                        : {}),
+      dueDate:                effectiveDueDate,
       ...(invoiceNumber   ? { invoiceNumber: String(invoiceNumber), invoiceNumberPrefix: prefix } : {}),
       ...(businessDetails ? { businessDetails }                                                 : {}),
       currency:               'AUD',
@@ -346,7 +354,7 @@ async function createJobInvoice(req, res) {
         total:         inv.total ?? 0,
         amountDue:     inv.amountDue ?? inv.amount_due ?? 0,
         issueDate:     inv.issueDate ?? issueDate,
-        dueDate:       inv.dueDate ?? dueDate ?? null,
+        dueDate:       inv.dueDate ?? effectiveDueDate ?? null,
         lineItems:     (inv.items ?? inv.invoiceItems ?? inv.lineItems ?? []).map((li) => ({
           name:      li.name ?? li.description ?? '',
           qty:       li.qty ?? li.quantity ?? 1,
