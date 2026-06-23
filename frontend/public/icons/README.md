@@ -1,18 +1,14 @@
 # PWA Icons
 
-Place the following icon files in this directory before building for production:
-
-| File | Size | Purpose |
-|------|------|---------|
-| `icon-192.png` | 192x192 px | Standard PWA icon (home screen, splash screen) |
-| `icon-512.png` | 512x512 px | High-resolution PWA icon (splash screen, app store) |
+These are the PWA app icons referenced by `manifest.json` and `index.html`.
+Full set: `icon-{72,96,128,144,152,180,192,256,384,512}x<same>.png`.
 
 ## Requirements
 
-- Format: PNG with transparency support
-- Both icons should use `purpose: "any maskable"` — design the icon with a safe zone
-  (roughly the inner 80% of the canvas) so Android's adaptive icon system can crop it safely.
-- Brand colors: `#1a1a2e` (dark navy background), accent `#e94560` (red/coral)
+- Format: PNG. The MoverHero mark sits on a **white tile** with a safe zone
+  (inner ~80% of the canvas) so Android's adaptive (maskable) cropping is clean.
+- `manifest.json` declares 192 + 512 with `purpose: "maskable"` in addition to `any`.
+- Brand colors: `#121212` (graphite background), accent `#ff7a18` (Hero Orange).
 
 ## Recommended tools
 

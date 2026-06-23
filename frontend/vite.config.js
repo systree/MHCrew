@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icons/icon-192.png', 'icons/icon-512.png'],
+      includeAssets: ['icons/icon-192x192.png', 'icons/icon-512x512.png'],
       manifest: false, // manifest is served from public/manifest.json
 
       // injectManifest: we provide our own SW source (src/sw-custom.js)

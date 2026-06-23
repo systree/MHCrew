@@ -66,7 +66,7 @@ registerRoute(
 registerRoute(
   ({ request }) => request.destination === 'image',
   new CacheFirst({
-    cacheName: 'image-cache',
+    cacheName: 'image-cache-v2',
     plugins: [
       new ExpirationPlugin({ maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 * 7 }),
       new CacheableResponsePlugin({ statuses: [0, 200] }),
@@ -99,8 +99,8 @@ self.addEventListener('push', (event) => {
   const title   = data.title ?? 'Mover Hero';
   const options = {
     body:  data.body  ?? '',
-    icon:  '/icons/icon-192.png',
-    badge: '/icons/icon-72.png',
+    icon:  '/icons/icon-192x192.png',
+    badge: '/icons/icon-72x72.png',
     tag:   data.tag   ?? 'mh-notification',
     data:  { url: data.url ?? '/dashboard' },
     vibrate:        [200, 100, 200],

@@ -307,7 +307,11 @@ export default function LoginPage() {
       {/* Logo / brand area */}
       <div style={styles.brand}>
         <div style={styles.logoMark}>
-          <span style={{ fontSize: 28, fontWeight: 900 }}>MH</span>
+          <img
+            src="/icons/icon-192x192.png"
+            alt="MoverHero"
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
         </div>
         <h1 style={styles.brandName}>Mover Hero</h1>
         <p style={styles.brandSub}>Crew Portal</p>
@@ -620,11 +624,7 @@ const styles = {
     width: 64,
     height: 64,
     borderRadius: 18,
-    background: 'linear-gradient(135deg, #ff7a18, #e06a10)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: '#fff',
+    overflow: 'hidden',
     marginBottom: 8,
     boxShadow: '0 8px 24px rgba(255,122,24,0.4)',
   },
