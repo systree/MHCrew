@@ -902,6 +902,53 @@ async function handleAssignedToUpdate(body, logId) {
 }
 
 // ---------------------------------------------------------------------------
+// reconcileAssignment — keep a job's GHL-sourced crew assignment in sync on
+// OpportunityUpdate / OpportunityStageUpdate events.
+//
+// Unlike OpportunityCreate (which always runs handleAssignedToUpdate once), this
+// only delegates to that handler when the assignee has actually CHANGED, so
+// routine opp edits don't re-notify the crew. A cleared/absent assignee is left
+// untouched (no-op), matching existing behavior. Reuses handleAssignedToUpdate
+// for the actual write + notification.
+// ---------------------------------------------------------------------------
+async function reconcileAssignment(body, logId) {
+  const ghlJobId  = body.id;
+  const ghlUserId = body.assignedTo;
+  if (!ghlJobId || !ghlUserId) return; // no/cleared assignee: leave existing assignment as-is
+
+  // Resolve the job (tenant-scoped)
+  const { data: job } = await supabase
+    .from('mh_pwa_jobs')
+    .select('id')
+    .eq('ghl_job_id', ghlJobId)
+    .eq('location_id', body.locationId)
+    .maybeSingle();
+  if (!job) return; // not synced yet — nothing to reconcile
+
+  // Resolve the incoming GHL assignee → app crew user (tenant-scoped)
+  const { data: crewUser } = await supabase
+    .from('mh_pwa_crew_users')
+    .select('id')
+    .eq('ghl_user_id', ghlUserId)
+    .eq('location_id', body.locationId)
+    .maybeSingle();
+  if (!crewUser) return; // assignee isn't an app crew member — nothing to do
+
+  // Compare against the job's current GHL-sourced assignment
+  const { data: currentRows } = await supabase
+    .from('mh_pwa_job_crew_assignments')
+    .select('crew_user_id')
+    .eq('job_id', job.id)
+    .eq('assigned_by', 'ghl');
+  const currentCrewId = currentRows?.[0]?.crew_user_id ?? null;
+
+  if (currentCrewId === crewUser.id) return; // already in sync → no write, no notification
+
+  // New or changed assignee → delegate to the existing handler (writes + notifies)
+  await handleAssignedToUpdate(body, logId);
+}
+
+// ---------------------------------------------------------------------------
 // Handler: UserCreate / UserUpdate
 // Provisions or updates a crew member in mh_pwa_crew_users.
 // ---------------------------------------------------------------------------
@@ -1063,6 +1110,7 @@ async function ghlHandler(req, res) {
       case 'OpportunityUpdate':
       case 'OpportunityStageUpdate':
         await handleOpportunityUpsert(body, logId);
+        if (body.assignedTo) await reconcileAssignment(body, logId);
         break;
 
       case 'OpportunityStatusUpdate':

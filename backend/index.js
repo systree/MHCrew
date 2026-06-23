@@ -24,7 +24,11 @@ app.use(
 );
 
 app.get("/health", (req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
+  res.json({
+    status: "ok",
+    commit: process.env.RAILWAY_GIT_COMMIT_SHA ?? "local",
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // Webhook route must be registered BEFORE express.json() so the raw body

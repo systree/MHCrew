@@ -929,6 +929,7 @@ export default function JobDetailPage() {
                 fontSize: "var(--font-size-sm)",
                 color: "var(--color-text)",
                 lineHeight: 1.6,
+                whiteSpace: "pre-wrap",
               }}
             >
               {movingInventory}
