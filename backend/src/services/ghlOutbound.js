@@ -253,7 +253,7 @@ const REQUIRED_FIELDS = [
   { name: 'Pickup Address',   fieldKey: 'pickup_address',  dataType: 'TEXT',       model: 'opportunity' },
   { name: 'Dropoff Address',  fieldKey: 'dropoff_address', dataType: 'TEXT',       model: 'opportunity' },
   { name: 'Scheduled Date',   fieldKey: 'scheduled_date',  dataType: 'TEXT',       model: 'opportunity' },
-  { name: 'Item Summary',     fieldKey: 'item_summary',    dataType: 'LARGE_TEXT', model: 'opportunity' },
+  { name: 'Moving Inventory', fieldKey: 'moving_inventory', dataType: 'LARGE_TEXT', model: 'opportunity' },
   { name: 'Crew Notes',       fieldKey: 'crew_notes',      dataType: 'LARGE_TEXT', model: 'opportunity' },
   { name: 'Job Status',       fieldKey: 'job_status',      dataType: 'TEXT',       model: 'opportunity' },
   {

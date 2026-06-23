@@ -315,7 +315,7 @@ When a GHL sub-account installs the app, the following happens automatically:
 2. GHL Location API called to fetch and store timezone + invoice branding
 3. In parallel (with a 45-second retry in case OAuth tokens aren't ready yet):
    - All GHL users with a phone number are imported as crew members
-   - Required custom fields provisioned on GHL opportunities (pickup address, dropoff address, scheduled date, item summary, crew notes, job status, job type)
+   - Required custom fields provisioned on GHL opportunities (pickup address, dropoff address, scheduled date, moving inventory, crew notes, job status, job type)
    - All GHL pipelines and their stages fetched and cached
 
 This means a newly installed company is fully operational within about a minute of installation, with zero manual setup required for the basic data import.

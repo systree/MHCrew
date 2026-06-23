@@ -273,7 +273,7 @@ export default function AdminDashboardPage() {
               <div style={styles.actionCardHeader}>
                 <div>
                   <p style={styles.actionTitle}>Initialize Required Fields</p>
-                  <p style={styles.actionDesc}>Creates the 6 required GHL custom fields if they don't exist yet</p>
+                  <p style={styles.actionDesc}>Creates the 7 required GHL custom fields if they don't exist yet</p>
                 </div>
               </div>
 

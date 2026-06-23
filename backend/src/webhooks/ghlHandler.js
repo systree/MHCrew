@@ -333,7 +333,7 @@ function buildJobPayload(opp, timezone = 'Australia/Sydney') {
     opp.close_date ||
     null;
 
-  const itemSummary = extractCustomField(customFields, 'opportunity.item_summary', 'item_summary', 'items') || null;
+  const movingInventory = extractCustomField(customFields, 'opportunity.moving_inventory', 'moving_inventory') || null;
   const crewNotes   = extractCustomField(customFields, 'opportunity.crew_notes', 'crew_notes', 'notes_for_crew', 'internal_notes') || null;
 
   const stageName    = opp.stage?.name ?? opp.stageName ?? null;
@@ -353,7 +353,7 @@ function buildJobPayload(opp, timezone = 'Australia/Sydney') {
     dropoff_address:  dropoffAddress,
     scheduled_date: scheduledRaw ? parseScheduledDate(scheduledRaw, timezone) : null,
     estimated_value:  opp.monetaryValue ?? null,
-    item_summary:     itemSummary,
+    moving_inventory: movingInventory,
     crew_notes:       crewNotes,
     // Only set status if mapped — never overwrite a crew-set status with null
     ...(mappedStatus ? { status: mappedStatus } : {}),

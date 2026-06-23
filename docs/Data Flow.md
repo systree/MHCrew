@@ -147,7 +147,7 @@ flowchart LR
 | `pickup_address` | GHL custom field `opportunity.pickup_address` |
 | `dropoff_address` | GHL custom field `opportunity.dropoff_address` |
 | `scheduled_date` | GHL custom field `opportunity.scheduled_date` (parsed to timestamptz) |
-| `item_summary` | GHL custom field `opportunity.item_summary` |
+| `moving_inventory` | GHL custom field `opportunity.moving_inventory` |
 | `crew_notes` | GHL custom field `opportunity.crew_notes` |
 | `job_type` | GHL custom field `opportunity.job_type` (dropdown mapped to enum) |
 | `status` | Derived from GHL stage name; updated by crew |

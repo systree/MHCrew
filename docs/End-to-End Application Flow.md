@@ -34,7 +34,7 @@ sequenceDiagram
 **What gets created:**
 - One `mh_pwa_tenants` row — the tenant is now active
 - One `mh_pwa_crew_users` row per GHL user who has a phone number
-- 7 custom fields on GHL opportunities (if they didn't exist): Pickup Address, Dropoff Address, Scheduled Date, Item Summary, Crew Notes, Job Status, Job Type
+- 7 custom fields on GHL opportunities (if they didn't exist): Pickup Address, Dropoff Address, Scheduled Date, Moving Inventory, Crew Notes, Job Status, Job Type
 - All pipeline stages cached in `mh_pwa_pipeline_stages`
 
 The company can start using the app immediately after install.

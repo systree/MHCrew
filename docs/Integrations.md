@@ -103,7 +103,7 @@ When a webhook arrives, the handler fetches the full opportunity and resolves it
 | Pickup Address | `opportunity.pickup_address` | TEXT |
 | Dropoff Address | `opportunity.dropoff_address` | TEXT |
 | Scheduled Date | `opportunity.scheduled_date` | TEXT |
-| Item Summary | `opportunity.item_summary` | LARGE_TEXT |
+| Moving Inventory | `opportunity.moving_inventory` | LARGE_TEXT |
 | Crew Notes | `opportunity.crew_notes` | LARGE_TEXT |
 | Job Status | `opportunity.job_status` | TEXT |
 | Job Type | `opportunity.job_type` | DROPDOWN (Door to Door / Depot to Depot / Quote) |

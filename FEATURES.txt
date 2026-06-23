@@ -15,7 +15,7 @@ FOR CREW MEMBERS
 ----------------
 • Job Dashboard — see all upcoming and past jobs in a clean daily view
 • Job Details — pickup/dropoff addresses, scheduled time, customer info,
-  item summary, and crew notes — all pulled live from GHL
+  moving inventory, and crew notes — all pulled live from GHL
 • Job Status Updates — tap to move a job through: En Route → Arrived →
   In Progress → Completed (or Cancelled). Status syncs back to GHL instantly
 • Timesheet — automatic clock-in when a job starts, clock-out when done.

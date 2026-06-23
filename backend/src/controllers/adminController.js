@@ -346,7 +346,7 @@ async function syncJobs(req, res) {
         dropoff_address: extractCF('opportunity.dropoff_address', 'dropoff_address', 'dropoff', 'delivery_address') || null,
         scheduled_date:  scheduledRaw ? parseScheduledDate(scheduledRaw, timezone) : null,
         estimated_value: opp.monetaryValue ?? null,
-        item_summary:    extractCF('opportunity.item_summary', 'item_summary', 'items') || null,
+        moving_inventory: extractCF('opportunity.moving_inventory', 'moving_inventory') || null,
         crew_notes:      extractCF('opportunity.crew_notes', 'crew_notes', 'notes_for_crew', 'internal_notes') || null,
         ...(mappedStatus ? { status: mappedStatus } : {}),
         location_id:     locationId,
@@ -404,7 +404,7 @@ async function refreshFields(req, res) {
 
 // ---------------------------------------------------------------------------
 // provisionFields — POST /api/admin/provision-fields
-// Creates the 6 required GHL opportunity custom fields if they don't exist,
+// Creates the 7 required GHL opportunity custom fields if they don't exist,
 // then refreshes the local field cache. Safe to call multiple times.
 // ---------------------------------------------------------------------------
 async function provisionFields(req, res) {
