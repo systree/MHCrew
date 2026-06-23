@@ -789,7 +789,31 @@ async function handleAssignedToUpdate(body, logId) {
   }
 
   if (!ghlUserId) {
-    logger.info(`OpportunityAssignedToUpdate: assignedTo cleared for opp=${ghlJobId}, skipping`);
+    // GHL assignee cleared → mirror it: remove the GHL-sourced assignment so the
+    // job drops off the previously-assigned crew member's list. Manual in-app
+    // assignments (assigned_by != 'ghl') are left untouched.
+    const { data: job } = await supabase
+      .from('mh_pwa_jobs')
+      .select('id')
+      .eq('ghl_job_id', ghlJobId)
+      .eq('location_id', body.locationId)
+      .maybeSingle();
+
+    if (job) {
+      const { error: delErr } = await supabase
+        .from('mh_pwa_job_crew_assignments')
+        .delete()
+        .eq('job_id', job.id)
+        .eq('assigned_by', 'ghl');
+      if (delErr) {
+        logger.warn(`AssignedToUpdate(clear): could not remove GHL assignment for job=${job.id}: ${delErr.message}`);
+      } else {
+        logger.info(`AssignedToUpdate: assignee cleared → removed GHL assignment for opp=${ghlJobId}`);
+      }
+    } else {
+      logger.info(`AssignedToUpdate: assignee cleared for opp=${ghlJobId} but no synced job — nothing to remove`);
+    }
+
     await updateSyncLog(logId, 'success');
     return;
   }
