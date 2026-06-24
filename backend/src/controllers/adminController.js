@@ -812,7 +812,7 @@ async function syncCrew(req, res) {
 
     const { error } = await supabase
       .from('mh_pwa_crew_users')
-      .upsert(crewRows, { onConflict: 'ghl_user_id' });
+      .upsert(crewRows, { onConflict: 'ghl_user_id,location_id' });
 
     if (error) {
       logger.error(`syncCrew upsert error location=${locationId}: ${error.message}`);

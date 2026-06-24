@@ -237,15 +237,22 @@ async function fetchAndStoreTimezone(locationId) {
   try {
     const client = await getGhlClient(locationId);
     const { data } = await client.get(`/locations/${locationId}`);
-    const tz = data?.location?.timezone ?? data?.timezone ?? null;
-    if (!tz) return;
+    const loc  = data?.location ?? data ?? {};
+    const tz   = loc.timezone ?? null;
+    const name = loc.name ?? null; // the LOCATION name — not the agency name seeded at INSTALL
+
+    const update = { updated_at: new Date().toISOString() };
+    if (tz)   update.timezone     = tz;
+    if (name) update.company_name = name;
+
+    if (!tz && !name) return;
 
     await supabase
       .from('mh_pwa_tenants')
-      .update({ timezone: tz, updated_at: new Date().toISOString() })
+      .update(update)
       .eq('location_id', locationId);
 
-    logger.info(`Timezone stored for location=${locationId}: ${tz}`);
+    logger.info(`Location info stored for location=${locationId}: name="${name}" tz=${tz}`);
   } catch (err) {
     // Tokens may not be ready yet — this is expected at INSTALL time.
     logger.warn(`fetchAndStoreTimezone skipped for location=${locationId}: ${err.message}`);
@@ -465,7 +472,7 @@ async function handleInstall(body, logId) {
 
         const { error } = await supabase
           .from('mh_pwa_crew_users')
-          .upsert(crewRows, { onConflict: 'ghl_user_id' });
+          .upsert(crewRows, { onConflict: 'ghl_user_id,location_id' });
 
         if (error) {
           logger.warn(`${tag} users upsert error location=${locationId}: ${error.message}`);
@@ -1005,7 +1012,7 @@ async function handleUserUpsert(body, logId) {
         is_active:   true,
         updated_at:  new Date().toISOString(),
       },
-      { onConflict: 'ghl_user_id' }
+      { onConflict: 'ghl_user_id,location_id' }
     );
 
   if (error) {
