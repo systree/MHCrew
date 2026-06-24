@@ -361,6 +361,26 @@ async function loginWithPin(req, res) {
       return res.status(401).json({ error: 'Invalid PIN' });
     }
 
+    // Build the full locations list (all active crew rows for this phone) so the
+    // post-login switcher reflects newly-added locations on PIN re-login too —
+    // not just on OTP login.
+    const { data: crewUsers } = await supabase
+      .from('mh_pwa_crew_users')
+      .select('location_id')
+      .eq('phone', phone)
+      .eq('is_active', true);
+
+    const locationIds = (crewUsers ?? []).map((u) => u.location_id);
+    const { data: tenants } = await supabase
+      .from('mh_pwa_tenants')
+      .select('location_id, company_name')
+      .in('location_id', locationIds);
+
+    const locations = (crewUsers ?? []).map((u) => ({
+      locationId:  u.location_id,
+      companyName: tenants?.find((t) => t.location_id === u.location_id)?.company_name ?? u.location_id,
+    }));
+
     const sessionToken = signSessionToken(crewUser);
     const timezone = await getTenantTimezone(crewUser.location_id);
     logger.info(`PIN login successful for ${phone}`);
@@ -370,6 +390,7 @@ async function loginWithPin(req, res) {
       sessionToken,
       timezone,
       user: publicUser(crewUser),
+      locations,
     });
   } catch (err) {
     logger.error('loginWithPin unexpected error', err);

@@ -73,8 +73,10 @@ export default function useAuth() {
   const loginWithPin = useCallback(
     async (phone, pin, locationId) => {
       const { data } = await authApi.loginWithPin(phone, pin, locationId);
-      // locations are preserved from the earlier verifyOtp call (already in store)
-      setAuth(data.user, data.sessionToken, data.timezone);
+      // Refresh the locations list so PIN re-login picks up newly-added locations.
+      // (Passing data.locations directly: if an older backend omits it, setAuth
+      //  preserves the existing list rather than wiping it.)
+      setAuth(data.user, data.sessionToken, data.timezone, data.locations);
       navigate('/dashboard', { replace: true });
     },
     [setAuth, navigate]
