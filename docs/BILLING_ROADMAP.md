@@ -51,8 +51,10 @@ payroll export, or just on-screen visibility?
 `createInvoiceSchedule.json`): `createJobInvoice` adds
 `paymentSchedule: { type: 'percentage', schedules: [{dueDate, value}] }` with a 33/33/34
 split when the crew ticks "Split into 3 payments" AND the tenant's
-`invoice_partial_payment_enabled` flag is on. Due dates auto-derive to today / +1 day /
-+21 days. GHL computes the per-instalment dollar amounts and the invoice auto-sends
+`invoice_partial_payment_enabled` flag is on. Due dates derive from the chosen
+first-payment date (or today, clamped to >= today): instalments on **d, d+1, d+2** with
+the invoice **due d+3** (GHL requires every schedule date strictly before the invoice due
+date). GHL computes the per-instalment dollar amounts and the invoice auto-sends
 (SMS+email) so the client gets one link covering all three. No extra migration (reuses the
 existing flag). Future tweaks if Rod asks: adjustable split %, operator-set milestone dates.
 
