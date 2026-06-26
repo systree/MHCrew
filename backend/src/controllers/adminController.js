@@ -5,8 +5,7 @@ const { getGhlClient }                = require('../services/ghl');
 const logger                          = require('../utils/logger');
 const { logActivity }                 = require('../utils/logger');
 const { provisionCustomFields }       = require('../services/ghlOutbound');
-const { STAGE_STATUS_MAP, mapStageToStatus } = require('../utils/stageStatusMap');
-const { parseScheduledDate } = require('../utils/dateUtils');
+const { buildJobRowFromGhl }          = require('../webhooks/ghlHandler');
 
 // ---------------------------------------------------------------------------
 // Role guard middleware
@@ -16,17 +15,6 @@ function requireAdmin(req, res, next) {
     return res.status(403).json({ error: 'Admin access required' });
   }
   next();
-}
-
-// ---------------------------------------------------------------------------
-// Resolve custom field UUIDs → field keys from DB
-// ---------------------------------------------------------------------------
-async function resolveFieldKeyMap(locationId) {
-  const { data: rows } = await supabase
-    .from('mh_pwa_location_custom_fields')
-    .select('field_id, field_key')
-    .eq('location_id', locationId);
-  return rows ? Object.fromEntries(rows.map((r) => [r.field_id, r.field_key])) : {};
 }
 
 // ---------------------------------------------------------------------------
@@ -271,10 +259,10 @@ async function syncJobs(req, res) {
   const locationId = req.user.locationId;
 
   try {
-    // Get pipeline_id and timezone from tenant
+    // Get pipeline_id from tenant
     const { data: tenant } = await supabase
       .from('mh_pwa_tenants')
-      .select('pipeline_id, timezone')
+      .select('pipeline_id')
       .eq('location_id', locationId)
       .maybeSingle();
 
@@ -283,9 +271,10 @@ async function syncJobs(req, res) {
     }
 
     const pipelineId = tenant.pipeline_id;
-    const timezone   = tenant.timezone ?? 'Australia/Sydney';
 
-    // Fetch opportunities from GHL
+    // Enumerate open opportunities in the pipeline. The search endpoint only
+    // returns a lean custom-field shape (fieldValueString), so we use it purely
+    // to discover ids and re-fetch each opportunity fully below.
     const client = await getGhlClient(locationId);
     const { data: ghlData } = await client.get('/opportunities/search', {
       params: {
@@ -297,63 +286,20 @@ async function syncJobs(req, res) {
     });
 
     const opportunities = ghlData?.opportunities ?? ghlData?.data ?? [];
+    const jobIds = opportunities.map((o) => o.id).filter(Boolean);
 
-    // Fetch field key map for resolving custom field UUIDs
-    const fieldKeyMap = await resolveFieldKeyMap(locationId);
+    if (jobIds.length === 0) {
+      return res.json({ ok: true, synced: 0 });
+    }
 
-    // Build job payloads
-    const jobRows = opportunities.map((opp) => {
-      const contact      = opp.contact ?? {};
-      const rawCF        = opp.customFields ?? opp.custom_fields ?? [];
-
-      // Resolve field UUIDs to keys
-      const customFields = rawCF.map((f) => ({
-        ...f,
-        key: fieldKeyMap[f.id] ?? f.key ?? f.fieldKey ?? null,
-      }));
-
-      function extractCF(...keys) {
-        for (const key of keys) {
-          const field = customFields.find(
-            (f) => f.key === key || f.id === key || f.fieldKey === key
-          );
-          const val = field?.value ?? field?.fieldValue ?? null;
-          if (val != null) return val;
-        }
-        return null;
-      }
-
-      const customerName =
-        contact.name ||
-        `${contact.firstName ?? ''} ${contact.lastName ?? ''}`.trim() ||
-        null;
-
-      const stageName    = opp.stage?.name ?? opp.stageName ?? null;
-      const mappedStatus = mapStageToStatus(stageName);
-
-      const scheduledRaw =
-        extractCF('opportunity.scheduled_date', 'scheduled_date', 'opportunity.move_date', 'move_date') ||
-        opp.closeDate ||
-        opp.close_date ||
-        null;
-
-      return {
-        ghl_job_id:      opp.id,
-        ghl_contact_id:  opp.contactId ?? opp.contact_id ?? contact.id ?? null,
-        customer_name:   customerName,
-        customer_phone:  contact.phone || contact.phoneRaw || null,
-        pickup_address:  extractCF('opportunity.pickup_address', 'pickup_address', 'pickup') || opp.address1 || null,
-        dropoff_address: extractCF('opportunity.dropoff_address', 'dropoff_address', 'dropoff', 'delivery_address') || null,
-        scheduled_date:  scheduledRaw ? parseScheduledDate(scheduledRaw, timezone) : null,
-        estimated_value: opp.monetaryValue ?? null,
-        moving_inventory: extractCF('opportunity.moving_inventory', 'moving_inventory') || null,
-        crew_notes:      extractCF('opportunity.crew_notes', 'crew_notes', 'notes_for_crew', 'internal_notes') || null,
-        ...(mappedStatus ? { status: mappedStatus } : {}),
-        location_id:     locationId,
-        raw_ghl_payload: opp,
-        updated_at:      new Date().toISOString(),
-      };
-    });
+    // Build each row via the SAME path the webhook uses (full per-id fetch →
+    // resolve field UUIDs → buildJobPayload). Guarantees identical rows and
+    // picks up job_type + custom fields the /opportunities/search shape omits.
+    const jobRows = [];
+    for (const jobId of jobIds) {
+      const row = await buildJobRowFromGhl(jobId, locationId);
+      if (row) jobRows.push(row);
+    }
 
     if (jobRows.length === 0) {
       return res.json({ ok: true, synced: 0 });

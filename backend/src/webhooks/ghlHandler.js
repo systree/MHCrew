@@ -371,6 +371,31 @@ function buildJobPayload(opp, timezone = 'Australia/Sydney') {
 }
 
 // ---------------------------------------------------------------------------
+// Build a job upsert row from a GHL opportunity id.
+// Fetches the full opportunity (rich [{ id, fieldValue }] custom-field shape),
+// resolves field UUIDs → keys, and runs buildJobPayload. Shared by the webhook
+// upsert and admin Sync Jobs so both paths produce identical rows (including
+// job_type and custom fields the /opportunities/search shape omits).
+// Returns the upsert payload, or null if the opportunity can't be fetched.
+// ---------------------------------------------------------------------------
+async function buildJobRowFromGhl(ghlJobId, locationId) {
+  const opp = await fetchFullOpportunity(ghlJobId, locationId);
+  if (!opp) return null;
+
+  const fieldKeyMap = await getFieldKeyMap(locationId);
+  if (Array.isArray(opp.customFields)) {
+    opp.customFields = opp.customFields.map((f) => ({
+      ...f,
+      key: fieldKeyMap[f.id] ?? f.key ?? null,
+    }));
+    logger.info(`Resolved custom fields: ${JSON.stringify(opp.customFields)}`);
+  }
+
+  const timezone = await getTenantTimezone(locationId);
+  return { ...buildJobPayload(opp, timezone), location_id: locationId };
+}
+
+// ---------------------------------------------------------------------------
 // Handler: AppInstall (type = "INSTALL")
 // Registers or reactivates a tenant in mh_pwa_tenants.
 // ---------------------------------------------------------------------------
@@ -672,28 +697,15 @@ async function handleOpportunityUpsert(body, logId) {
   }
 
   logger.info(`Fetching full opportunity from GHL API: ${ghlJobId} location=${body.locationId}`);
-  const opp = await fetchFullOpportunity(ghlJobId, body.locationId);
+  const payload = await buildJobRowFromGhl(ghlJobId, body.locationId);
 
-  if (!opp) {
+  if (!payload) {
     const msg = `Could not fetch opportunity ${ghlJobId} from GHL API`;
     logger.error(msg);
     await updateSyncLog(logId, 'failed', msg);
     return;
   }
 
-  // Resolve field UUIDs → fieldKey names so extractCustomField can match by name.
-  // GHL returns customFields as [{ id, fieldValue }] — no key on the opp fetch.
-  const fieldKeyMap = await getFieldKeyMap(body.locationId);
-  if (Array.isArray(opp.customFields)) {
-    opp.customFields = opp.customFields.map((f) => ({
-      ...f,
-      key: fieldKeyMap[f.id] ?? f.key ?? null,
-    }));
-    logger.info(`Resolved custom fields: ${JSON.stringify(opp.customFields)}`);
-  }
-
-  const timezone = await getTenantTimezone(body.locationId);
-  const payload = { ...buildJobPayload(opp, timezone), location_id: body.locationId };
   logger.info(`Upserting job ghl_job_id=${ghlJobId} location=${body.locationId} status=${payload.status ?? '(unchanged)'}`);
 
   const { error } = await supabase
@@ -1182,3 +1194,5 @@ async function ghlHandler(req, res) {
 }
 
 module.exports = ghlHandler;
+// Shared with adminController's Sync Jobs so both build identical job rows.
+module.exports.buildJobRowFromGhl = buildJobRowFromGhl;
