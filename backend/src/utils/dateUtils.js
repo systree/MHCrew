@@ -61,10 +61,10 @@ function naiveToUtcIso(year, month, day, hour, minute, timezone) {
 /**
  * Parse a GHL scheduled date string into a UTC ISO string.
  *
- * Supported formats:
- *   - DD/MM/YYYY HH:MM AM/PM  e.g. "08/04/2026 9:30 AM"
- *   - DD/MM/YYYY HH:MM        e.g. "08/04/2026 14:30"
- *   - DD/MM/YYYY              e.g. "08/04/2026"   (stored as midnight UTC in tz)
+ * Supported formats (day-first; "/" or "-" separators):
+ *   - DD/MM/YYYY HH:MM AM/PM  e.g. "08/04/2026 9:30 AM"  or  "08-04-2026 9:30 AM"
+ *   - DD/MM/YYYY HH:MM        e.g. "08/04/2026 14:30"    or  "08-04-2026 14:30"
+ *   - DD/MM/YYYY              e.g. "08/04/2026"          or  "08-04-2026"  (midnight UTC in tz)
  *   - YYYY-MM-DD              e.g. "2026-04-08"
  *   - Any ISO string          e.g. "2026-04-08T09:30:00Z"  (passed through)
  *
@@ -78,9 +78,9 @@ function parseScheduledDate(raw, timezone = 'UTC') {
   if (!raw) return null;
   const s = String(raw).trim();
 
-  // AU format: DD/MM/YYYY [HH:MM[ AM|PM]]
+  // AU format: DD/MM/YYYY or DD-MM-YYYY [HH:MM[ AM|PM]]
   const auMatch = s.match(
-    /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?:\s*(AM|PM))?)?$/i
+    /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})(?:\s+(\d{1,2}):(\d{2})(?:\s*(AM|PM))?)?$/i
   );
   if (auMatch) {
     const [, dd, mm, yyyy, rawH, min = '00', ampm] = auMatch;
