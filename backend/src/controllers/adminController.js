@@ -5,7 +5,7 @@ const { getGhlClient }                = require('../services/ghl');
 const logger                          = require('../utils/logger');
 const { logActivity }                 = require('../utils/logger');
 const { provisionCustomFields }       = require('../services/ghlOutbound');
-const { buildJobRowFromGhl }          = require('../webhooks/ghlHandler');
+const { buildJobRowFromGhl, reconcileFollowers } = require('../webhooks/ghlHandler');
 
 // ---------------------------------------------------------------------------
 // Role guard middleware
@@ -305,13 +305,21 @@ async function syncJobs(req, res) {
       return res.json({ ok: true, synced: 0 });
     }
 
-    const { error: upsertErr } = await supabase
+    const { data: upsertedJobs, error: upsertErr } = await supabase
       .from('mh_pwa_jobs')
-      .upsert(jobRows, { onConflict: 'ghl_job_id' });
+      .upsert(jobRows, { onConflict: 'ghl_job_id' })
+      .select('id, ghl_job_id');
 
     if (upsertErr) {
       logger.error(`syncJobs upsert error location=${locationId}: ${upsertErr.message}`);
       return res.status(500).json({ error: 'Failed to sync jobs' });
+    }
+
+    // Mirror opportunity followers → crew assignments (same as the webhook path).
+    const jobIdByGhlId = new Map((upsertedJobs ?? []).map((j) => [j.ghl_job_id, j.id]));
+    for (const row of jobRows) {
+      const jobId = jobIdByGhlId.get(row.ghl_job_id);
+      if (jobId) await reconcileFollowers(jobId, row.raw_ghl_payload?.followers, locationId);
     }
 
     logger.info(`syncJobs: synced ${jobRows.length} jobs for location=${locationId} pipeline=${pipelineId}`);

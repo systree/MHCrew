@@ -708,15 +708,22 @@ async function handleOpportunityUpsert(body, logId) {
 
   logger.info(`Upserting job ghl_job_id=${ghlJobId} location=${body.locationId} status=${payload.status ?? '(unchanged)'}`);
 
-  const { error } = await supabase
+  const { data: upserted, error } = await supabase
     .from('mh_pwa_jobs')
-    .upsert(payload, { onConflict: 'ghl_job_id' });
+    .upsert(payload, { onConflict: 'ghl_job_id' })
+    .select('id')
+    .maybeSingle();
 
   if (error) {
     const msg = `Job upsert failed for ghl_job_id=${ghlJobId}: ${error.message}`;
     logger.error(msg);
     await updateSyncLog(logId, 'failed', msg);
     return;
+  }
+
+  // Mirror opportunity followers → crew assignments so followers also see the job.
+  if (upserted?.id) {
+    await reconcileFollowers(upserted.id, payload.raw_ghl_payload?.followers, body.locationId);
   }
 
   logger.info(`Job upserted: ghl_job_id=${ghlJobId}`);
@@ -992,6 +999,87 @@ async function reconcileAssignment(body, logId) {
 }
 
 // ---------------------------------------------------------------------------
+// reconcileFollowers — mirror an opportunity's `followers` array into crew
+// assignments so followers see the job in their profile too.
+//
+// Uses a distinct assigned_by='ghl_follower' tag so it never touches the
+// primary assignee row (assigned_by='ghl') or manual in-app assignments.
+// Reconciles as a SET: adds new followers, removes dropped ones. Idempotent —
+// safe to run on every opportunity upsert. Skips a follower who is already the
+// GHL assignee (they already see the job) and any follower not provisioned as
+// crew in this location. Never throws — logs and returns on error.
+// ---------------------------------------------------------------------------
+async function reconcileFollowers(jobId, followerGhlIds, locationId) {
+  const ids = Array.isArray(followerGhlIds) ? [...new Set(followerGhlIds.filter(Boolean))] : [];
+
+  // Map follower GHL user ids → app crew_user ids (tenant-scoped)
+  let desiredCrewIds = [];
+  if (ids.length > 0) {
+    const { data: crewRows, error } = await supabase
+      .from('mh_pwa_crew_users')
+      .select('id')
+      .eq('location_id', locationId)
+      .in('ghl_user_id', ids);
+    if (error) {
+      logger.warn(`reconcileFollowers: crew lookup error job=${jobId}: ${error.message}`);
+      return;
+    }
+    desiredCrewIds = (crewRows ?? []).map((r) => r.id);
+  }
+  const desired = new Set(desiredCrewIds);
+
+  // Current follower-sourced assignments for this job
+  const { data: currentRows, error: curErr } = await supabase
+    .from('mh_pwa_job_crew_assignments')
+    .select('crew_user_id')
+    .eq('job_id', jobId)
+    .eq('assigned_by', 'ghl_follower');
+  if (curErr) {
+    logger.warn(`reconcileFollowers: current fetch error job=${jobId}: ${curErr.message}`);
+    return;
+  }
+  const current = new Set((currentRows ?? []).map((r) => r.crew_user_id));
+
+  // Remove followers no longer on the opportunity
+  const toRemove = [...current].filter((id) => !desired.has(id));
+  if (toRemove.length > 0) {
+    const { error: delErr } = await supabase
+      .from('mh_pwa_job_crew_assignments')
+      .delete()
+      .eq('job_id', jobId)
+      .eq('assigned_by', 'ghl_follower')
+      .in('crew_user_id', toRemove);
+    if (delErr) logger.warn(`reconcileFollowers: delete error job=${jobId}: ${delErr.message}`);
+  }
+
+  // Add new followers — but skip anyone who is already the primary GHL assignee
+  const toAdd = [...desired].filter((id) => !current.has(id));
+  if (toAdd.length > 0) {
+    const { data: assigneeRows } = await supabase
+      .from('mh_pwa_job_crew_assignments')
+      .select('crew_user_id')
+      .eq('job_id', jobId)
+      .eq('assigned_by', 'ghl')
+      .in('crew_user_id', toAdd);
+    const assignee = new Set((assigneeRows ?? []).map((r) => r.crew_user_id));
+
+    const rows = toAdd
+      .filter((id) => !assignee.has(id))
+      .map((id) => ({ job_id: jobId, crew_user_id: id, assigned_by: 'ghl_follower' }));
+
+    if (rows.length > 0) {
+      // ignoreDuplicates so we never flip an existing row's assigned_by tag.
+      const { error: insErr } = await supabase
+        .from('mh_pwa_job_crew_assignments')
+        .upsert(rows, { onConflict: 'job_id,crew_user_id', ignoreDuplicates: true });
+      if (insErr) logger.warn(`reconcileFollowers: insert error job=${jobId}: ${insErr.message}`);
+    }
+  }
+
+  logger.info(`reconcileFollowers: job=${jobId} followers desired=${desired.size} removed=${toRemove.length}`);
+}
+
+// ---------------------------------------------------------------------------
 // Handler: UserCreate / UserUpdate
 // Provisions or updates a crew member in mh_pwa_crew_users.
 // ---------------------------------------------------------------------------
@@ -1194,5 +1282,7 @@ async function ghlHandler(req, res) {
 }
 
 module.exports = ghlHandler;
-// Shared with adminController's Sync Jobs so both build identical job rows.
+// Shared with adminController's Sync Jobs so both build identical job rows
+// and mirror opportunity followers into crew assignments the same way.
 module.exports.buildJobRowFromGhl = buildJobRowFromGhl;
+module.exports.reconcileFollowers = reconcileFollowers;
