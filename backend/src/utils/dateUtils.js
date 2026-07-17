@@ -65,6 +65,7 @@ function naiveToUtcIso(year, month, day, hour, minute, timezone) {
  *   - DD/MM/YYYY HH:MM AM/PM  e.g. "08/04/2026 9:30 AM"  or  "08-04-2026 9:30 AM"
  *   - DD/MM/YYYY HH:MM        e.g. "08/04/2026 14:30"    or  "08-04-2026 14:30"
  *   - DD/MM/YYYY              e.g. "08/04/2026"          or  "08-04-2026"  (midnight UTC in tz)
+ *   - Weekday, Month DD, YYYY H:MM AM/PM  e.g. "Friday, July 17, 2026 8:00 AM"
  *   - YYYY-MM-DD              e.g. "2026-04-08"
  *   - Any ISO string          e.g. "2026-04-08T09:30:00Z"  (passed through)
  *
@@ -74,6 +75,30 @@ function naiveToUtcIso(year, month, day, hour, minute, timezone) {
  *                               timezone so that "09:30 AM" is stored correctly.
  * @returns {string|null} UTC ISO string, or null if unparseable
  */
+const MONTH_NAMES = {
+  jan: 1, january: 1,
+  feb: 2, february: 2,
+  mar: 3, march: 3,
+  apr: 4, april: 4,
+  may: 5,
+  jun: 6, june: 6,
+  jul: 7, july: 7,
+  aug: 8, august: 8,
+  sep: 9, sept: 9, september: 9,
+  oct: 10, october: 10,
+  nov: 11, november: 11,
+  dec: 12, december: 12,
+};
+
+// Convert a 12-hour clock hour + AM/PM marker to 24-hour. `ampm` may be undefined
+// (already 24-hour) or 'AM'/'PM' in any case.
+function to24Hour(hour, ampm) {
+  if (!ampm) return hour;
+  if (ampm.toUpperCase() === 'AM' && hour === 12) return 0;
+  if (ampm.toUpperCase() === 'PM' && hour !== 12) return hour + 12;
+  return hour;
+}
+
 function parseScheduledDate(raw, timezone = 'UTC') {
   if (!raw) return null;
   const s = String(raw).trim();
@@ -84,19 +109,34 @@ function parseScheduledDate(raw, timezone = 'UTC') {
   );
   if (auMatch) {
     const [, dd, mm, yyyy, rawH, min = '00', ampm] = auMatch;
-    let hour = parseInt(rawH ?? '0', 10);
-    if (ampm) {
-      if (ampm.toUpperCase() === 'AM' && hour === 12) hour = 0;
-      if (ampm.toUpperCase() === 'PM' && hour !== 12) hour += 12;
-    }
     return naiveToUtcIso(
       parseInt(yyyy, 10),
       parseInt(mm, 10),
       parseInt(dd, 10),
-      hour,
+      to24Hour(parseInt(rawH ?? '0', 10), ampm),
       parseInt(min, 10),
       timezone
     );
+  }
+
+  // "Weekday, Month DD, YYYY H:MM AM/PM" — e.g. "Friday, July 17, 2026 8:00 AM".
+  // Leading weekday + comma is optional/ignored.
+  const monthNameMatch = s.match(
+    /^(?:\w+,\s*)?([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})(?:\s+(\d{1,2}):(\d{2})(?:\s*(AM|PM))?)?$/i
+  );
+  if (monthNameMatch) {
+    const [, monthName, dd, yyyy, rawH, min = '00', ampm] = monthNameMatch;
+    const mm = MONTH_NAMES[monthName.toLowerCase()];
+    if (mm) {
+      return naiveToUtcIso(
+        parseInt(yyyy, 10),
+        mm,
+        parseInt(dd, 10),
+        to24Hour(parseInt(rawH ?? '0', 10), ampm),
+        parseInt(min, 10),
+        timezone
+      );
+    }
   }
 
   // ISO date-only YYYY-MM-DD — treat as midnight in the location timezone
