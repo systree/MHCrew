@@ -36,32 +36,23 @@ export default function LocationPromptCard() {
     if (isGrantedPermanent()) { setState('granted'); return; }
     if (sessionStorage.getItem('mh_loc_snoozed') === '1') { setState('snoozed'); return; }
 
-    if (!navigator.permissions) {
-      setState('prompt');
-      return;
-    }
-
-    navigator.permissions.query({ name: 'geolocation' }).then((result) => {
-      if (result.state === 'granted') {
+    // Detect actual grant state with a silent, cached-position probe rather than
+    // navigator.permissions.query('geolocation') — on iOS/WebKit (especially
+    // standalone home-screen PWAs) that API is unreliable and can report
+    // 'prompt' even when permission was already granted, making this card
+    // reappear every launch. A large maximumAge means this reuses the OS's
+    // last known fix instead of forcing a new GPS read, and never shows a
+    // native prompt when permission has already been decided.
+    navigator.geolocation.getCurrentPosition(
+      () => {
         markGrantedPermanent();
         setState('granted');
-        return;
-      }
-      if (result.state === 'denied') {
-        setState('denied');
-        return;
-      }
-      setState('prompt');
-
-      result.onchange = () => {
-        if (result.state === 'granted') {
-          markGrantedPermanent();
-          setState('granted');
-        } else if (result.state === 'denied') {
-          setState('denied');
-        }
-      };
-    }).catch(() => setState('prompt'));
+      },
+      (err) => {
+        setState(err.code === err.PERMISSION_DENIED ? 'denied' : 'prompt');
+      },
+      { maximumAge: 24 * 60 * 60 * 1000, timeout: 5000 }
+    );
   }, [supported]);
 
   // Nothing to show in these states
