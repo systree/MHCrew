@@ -4,7 +4,7 @@ const supabase                        = require('../services/supabase');
 const { getGhlClient }                = require('../services/ghl');
 const logger                          = require('../utils/logger');
 const { logActivity }                 = require('../utils/logger');
-const { provisionCustomFields }       = require('../services/ghlOutbound');
+const { provisionCustomFields, applyDefaultJobStatuses } = require('../services/ghlOutbound');
 const { buildJobRowFromGhl, reconcileFollowers } = require('../webhooks/ghlHandler');
 
 // ---------------------------------------------------------------------------
@@ -100,6 +100,7 @@ async function setPipeline(req, res) {
         logger.warn(`setPipeline stages upsert error location=${locationId}: ${upsertErr.message}`);
       } else {
         logger.info(`setPipeline: upserted ${upsertRows.length} stages for pipeline=${pipelineId} location=${locationId}`);
+        await applyDefaultJobStatuses(locationId, upsertRows);
       }
     }
 
@@ -579,6 +580,8 @@ async function syncStages(req, res) {
       logger.error(`syncStages upsert error location=${locationId}: ${error.message}`);
       return res.status(500).json({ error: 'Failed to sync stages' });
     }
+
+    await applyDefaultJobStatuses(locationId, upsertRows);
 
     logger.info(`syncStages: synced ${upsertRows.length} stages for location=${locationId} pipeline=${pipelineId}`);
     logActivity('admin', 'sync_stages', { userId: req.user.userId, locationId, pipelineId, synced: upsertRows.length });

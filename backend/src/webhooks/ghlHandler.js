@@ -8,7 +8,7 @@ const { logActivity }                     = require('../utils/logger');
 const { STAGE_STATUS_MAP, mapStageToStatus } = require('../utils/stageStatusMap');
 const { parseScheduledDate } = require('../utils/dateUtils');
 const { notifyUser, getNotificationSettings } = require('../services/pushService');
-const { provisionCustomFields } = require('../services/ghlOutbound');
+const { provisionCustomFields, provisionPipeline, applyDefaultJobStatuses } = require('../services/ghlOutbound');
 
 // ---------------------------------------------------------------------------
 // Signature verification — Ed25519 (X-GHL-Signature)
@@ -311,9 +311,29 @@ async function getTenantTimezone(locationId) {
 }
 
 // ---------------------------------------------------------------------------
+// Resolve a stage → job_status. Prefers the tenant's own mapping
+// (mh_pwa_pipeline_stages.job_status, set via admin Stage Mapping or
+// pre-filled by applyDefaultJobStatuses), falling back to the global
+// name-based STAGE_STATUS_MAP when the stage isn't in the table yet
+// (e.g. a webhook arriving before the pipeline stages have been synced).
+// ---------------------------------------------------------------------------
+async function resolveJobStatus(locationId, stageId, stageName) {
+  if (stageId) {
+    const { data } = await supabase
+      .from('mh_pwa_pipeline_stages')
+      .select('job_status')
+      .eq('location_id', locationId)
+      .eq('stage_id', stageId)
+      .maybeSingle();
+    if (data?.job_status) return data.job_status;
+  }
+  return mapStageToStatus(stageName);
+}
+
+// ---------------------------------------------------------------------------
 // Build job upsert payload from a full GHL opportunity record
 // ---------------------------------------------------------------------------
-function buildJobPayload(opp, timezone = 'Australia/Sydney') {
+async function buildJobPayload(opp, timezone = 'Australia/Sydney', locationId = null) {
   const contact      = opp.contact ?? {};
   const customFields = opp.customFields ?? opp.custom_fields ?? [];
 
@@ -343,8 +363,9 @@ function buildJobPayload(opp, timezone = 'Australia/Sydney') {
   const movingInventory = extractCustomField(customFields, 'opportunity.moving_inventory', 'moving_inventory') || null;
   const crewNotes   = extractCustomField(customFields, 'opportunity.crew_notes', 'crew_notes', 'notes_for_crew', 'internal_notes') || null;
 
+  const stageId      = opp.pipelineStageId ?? opp.stage?.id ?? opp.stageId ?? null;
   const stageName    = opp.stage?.name ?? opp.stageName ?? null;
-  const mappedStatus = mapStageToStatus(stageName);
+  const mappedStatus = await resolveJobStatus(locationId, stageId, stageName);
 
   // Map GHL dropdown label → DB enum value
   const jobTypeRaw = extractCustomField(customFields, 'opportunity.job_type', 'job_type') || null;
@@ -392,7 +413,7 @@ async function buildJobRowFromGhl(ghlJobId, locationId) {
   }
 
   const timezone = await getTenantTimezone(locationId);
-  return { ...buildJobPayload(opp, timezone), location_id: locationId };
+  return { ...(await buildJobPayload(opp, timezone, locationId)), location_id: locationId };
 }
 
 // ---------------------------------------------------------------------------
@@ -514,26 +535,57 @@ async function handleInstall(body, logId) {
         logger.info(`${tag}: cached ${Object.keys(map).length} custom fields for location=${locationId}`);
       })(),
 
-      // Task 3: Fetch pipelines and upsert all stages
+      // Task 3: Ensure a pipeline is configured and its stages are synced.
+      // Tenants who already have a pipeline_id (manual selection, or a prior
+      // install) keep it untouched — we only resync their stages. Only a
+      // genuinely fresh tenant gets the "Mover Hero" pipeline auto-provisioned.
       (async () => {
-        const client = await getGhlClient(locationId);
-        const { data: pipelineData } = await client.get('/opportunities/pipelines', {
-          params: { locationId },
-        });
-        const pipelines = pipelineData?.pipelines ?? [];
-        const stageRows = [];
+        const { data: existingTenant } = await supabase
+          .from('mh_pwa_tenants')
+          .select('pipeline_id')
+          .eq('location_id', locationId)
+          .maybeSingle();
 
-        for (const pipeline of pipelines) {
-          for (const stage of (pipeline.stages ?? [])) {
-            stageRows.push({
-              location_id: locationId,
-              pipeline_id: pipeline.id,
-              stage_id:    stage.id,
-              stage_name:  stage.name,
-              sort_order:  stage.position ?? null,
-              updated_at:  new Date().toISOString(),
-            });
+        let stageRows = [];
+
+        if (existingTenant?.pipeline_id) {
+          const client = await getGhlClient(locationId);
+          const { data: pipelineData } = await client.get('/opportunities/pipelines', {
+            params: { locationId },
+          });
+          const pipelines = pipelineData?.pipelines ?? [];
+
+          for (const pipeline of pipelines) {
+            for (const stage of (pipeline.stages ?? [])) {
+              stageRows.push({
+                location_id: locationId,
+                pipeline_id: pipeline.id,
+                stage_id:    stage.id,
+                stage_name:  stage.name,
+                sort_order:  stage.position ?? null,
+                updated_at:  new Date().toISOString(),
+              });
+            }
           }
+        } else {
+          const { pipelineId, stages } = await provisionPipeline(locationId);
+
+          const { error: tenantErr } = await supabase
+            .from('mh_pwa_tenants')
+            .update({ pipeline_id: pipelineId, updated_at: new Date().toISOString() })
+            .eq('location_id', locationId);
+          if (tenantErr) {
+            logger.warn(`${tag} tenant pipeline_id update error location=${locationId}: ${tenantErr.message}`);
+          }
+
+          stageRows = stages.map((stage) => ({
+            location_id: locationId,
+            pipeline_id: pipelineId,
+            stage_id:    stage.id,
+            stage_name:  stage.name,
+            sort_order:  stage.position ?? null,
+            updated_at:  new Date().toISOString(),
+          }));
         }
 
         if (!stageRows.length) {
@@ -549,6 +601,7 @@ async function handleInstall(body, logId) {
           logger.warn(`${tag} stages upsert error location=${locationId}: ${error.message}`);
         } else {
           logger.info(`${tag}: upserted ${stageRows.length} pipeline stages for location=${locationId}`);
+          await applyDefaultJobStatuses(locationId, stageRows);
         }
       })(),
     ];

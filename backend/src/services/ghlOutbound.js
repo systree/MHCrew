@@ -4,6 +4,7 @@ const { getGhlClient } = require('./ghl');
 const supabase         = require('./supabase');
 const logger           = require('../utils/logger');
 const { retryWithBackoff } = require('../utils/retry');
+const { mapStageToStatus } = require('../utils/stageStatusMap');
 
 // ---------------------------------------------------------------------------
 // Sync log helper
@@ -348,6 +349,87 @@ async function provisionCustomFields(locationId) {
   return result;
 }
 
+// ---------------------------------------------------------------------------
+// provisionPipeline
+// Ensures a "Mover Hero" pipeline exists for the location — reuses it if a
+// pipeline with that exact name is already there (e.g. re-install), otherwise
+// creates it with the fixed stage set below. Idempotent — safe to call on
+// every install. Does NOT touch mh_pwa_tenants or mh_pwa_pipeline_stages;
+// callers are responsible for persisting the returned pipelineId/stages.
+// Returns { pipelineId, stages: [{ id, name, position }] }
+// ---------------------------------------------------------------------------
+const PIPELINE_NAME = 'Mover Hero';
+
+const DEFAULT_STAGES = [
+  { name: 'New Lead',             color: '#2563EB' },
+  { name: 'Inventory Submitted',  color: '#0D9488' },
+  { name: 'Booked',               color: '#7C3AED' },
+  { name: 'En Route',             color: '#D97706' },
+  { name: 'On Site',              color: '#0EA5E9' },
+  { name: 'In Progress',          color: '#CA8A04' },
+  { name: 'Completed',            color: '#16A34A' },
+  { name: 'Cancelled',            color: '#DC2626' },
+];
+
+async function provisionPipeline(locationId) {
+  const client = await getGhlClient(locationId);
+  const { data: ghlData } = await client.get('/opportunities/pipelines', {
+    params: { locationId },
+  });
+
+  const existing = (ghlData?.pipelines ?? []).find((p) => p.name === PIPELINE_NAME);
+  if (existing) {
+    logger.info(`provisionPipeline: reusing existing "${PIPELINE_NAME}" pipeline=${existing.id} for location=${locationId}`);
+    return { pipelineId: existing.id, stages: existing.stages ?? [] };
+  }
+
+  const { data: createdData } = await client.post('/opportunities/pipelines', {
+    name:                      PIPELINE_NAME,
+    locationId,
+    colorRenderMode:           'bg-tint',
+    showInFunnel:              true,
+    showInPieChart:             true,
+    useOpportunityProbability: false,
+    stages: DEFAULT_STAGES.map((stage, i) => ({
+      name:               stage.name,
+      position:           i,
+      showInFunnel:       true,
+      showInPieChart:     true,
+      color:              stage.color,
+      stageWinProbability: 0,
+    })),
+  });
+
+  const created = createdData?.pipeline ?? createdData;
+  logger.info(`provisionPipeline: created "${PIPELINE_NAME}" pipeline=${created.id} for location=${locationId}`);
+  return { pipelineId: created.id, stages: created.stages ?? [] };
+}
+
+// ---------------------------------------------------------------------------
+// applyDefaultJobStatuses
+// Fills in a sensible default job_status (from STAGE_STATUS_MAP, by stage
+// name) for any stage row that doesn't have one set yet. Never overwrites a
+// value an admin already configured — guarded by `job_status IS NULL`.
+// stageRows: [{ stage_id, stage_name }]
+// ---------------------------------------------------------------------------
+async function applyDefaultJobStatuses(locationId, stageRows) {
+  for (const { stage_id: stageId, stage_name: stageName } of stageRows) {
+    const defaultStatus = mapStageToStatus(stageName);
+    if (!defaultStatus) continue; // no recognizable default — leave unmapped (e.g. New Lead)
+
+    const { error } = await supabase
+      .from('mh_pwa_pipeline_stages')
+      .update({ job_status: defaultStatus, updated_at: new Date().toISOString() })
+      .eq('location_id', locationId)
+      .eq('stage_id', stageId)
+      .is('job_status', null);
+
+    if (error) {
+      logger.warn(`applyDefaultJobStatuses: failed for stage=${stageId} location=${locationId}: ${error.message}`);
+    }
+  }
+}
+
 module.exports = {
   pushStatusUpdate,
   pushCompletion,
@@ -357,4 +439,6 @@ module.exports = {
   pushStageUpdate,
   pushCustomFieldUpdate,
   provisionCustomFields,
+  provisionPipeline,
+  applyDefaultJobStatuses,
 };
